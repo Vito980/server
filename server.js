@@ -16,7 +16,7 @@ const relayDeviceEUI = '495EFCB2947C5A9C'; // Device EUI del relé
 const relayDeviceID = 'df0e76b0-934c-11f0-8bf6-23e0814aad86'; // Device ID del relé
 
 // Token obtenido con curl
-const apiToken = 'eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJ6dXJpdGF2aWN0b3IwMDJAZ21haWwuY29tIiwic2NvcGVzIjpbIkNVU1RPTUVSX0FETUlOIiwiTlMiLCJPQU0iXSwidXNlcklkIjoiYWM4MDRlNTAtOGU5MC0xMWYwLThiZjYtMjNlMDgxNGFhZDg2IiwiZmlyc3ROYW1lIjoiVmljdG9yIiwibGFzdE5hbWUiOiJadXJpdGEiLCJlbmFibGVkIjp0cnVlLCJwcm92aWRlcklkIjoiOTQwOTc1MzAtN2M0OS0xMWYwLTlkOTEtZGYyOWQ2OGYyODNhIiwiY3VzdG9tZXJJZCI6IjMyZWI4YTEwLThlOGYtMTFmMC05ZDkxLWRmMjlkNjhmMjgzYSIsImlzcyI6InRla3RlbGljLmNvbSIsImlhdCI6MTc1ODIxNjIyMywiZXhwIjoxNzU4MjIzNDIzfQ.-5tniNqTOcThuhGN1cCN66ITQXUmKAsuFq3tE8R1jz22_fQtIKYO2rEbBKGzU77NIKhMcissOw7P80qeI5c5_g'; // Pon aquí tu token completo
+const apiToken = 'eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJ6dXJpdGF2aWN0b3IwMDJAZ21haWwuY29tIiwic2NvcGVzIjpbIkNVU1RPTUVSX0FETUlOIiwiTlMiLCJPQU0iXSwidXNlcklkIjoiYWM4MDRlNTAtOGU5MC0xMWYwLThiZjYtMjNlMDgxNGFhZDg2IiwiZmlyc3ROYW1lIjoiVmljdG9yIiwibGFzdE5hbWUiOiJadXJpdGEiLCJlbmFibGVkIjp0cnVlLCJwcm92aWRlcklkIjoiOTQwOTc1MzAtN2M0OS0xMWYwLTlkOTEtZGYyOWQ2OGYyODNhIiwiY3VzdG9tZXJJZCI6IjMyZWI4YTEwLThlOGYtMTFmMC05ZDkxLWRmMjlkNjhmMjgzYSIsImlzcyI6InRla3RlbGljLmNvbSIsImlhdCI6MTc1ODIxNzA3OCwiZXhwIjoxNzU4MjI0Mjc4fQ.4gKDhxEFvp-GSzb6c2Wm5A9HC1lGWu4wOvNDiZUzlTWf-Yc69GHqBtJ5wadaENSHx2f6AkZbM-yOmHX7R8S9Xw'; // Pon aquí tu token completo
 
 // URL base de la API Kona Core (ajusta según tu configuración)
 const baseUrl = 'https://lorawan-ns-na.tektelic.com/api/v1'; 
@@ -1715,6 +1715,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.listen(PORT, () => {
   console.log(`Servidor escuchando en http://localhost:${PORT}`);
 });
+
 
 
 
