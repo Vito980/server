@@ -1,1666 +1,1666 @@
-const express = require('express');
+constante express = require('express');
 const bodyParser = require('body-parser');
-const cors = require('cors');
-const path = require('path');
+constante cors = require('cors');
+constante path = require('path');
 
-const app = express();
-const PORT = 3000;
+constante aplicación = express();
+constante PUERTO = 3000;
 
-let latestSensorData = null;
-let allSensorsData = {};
+deje que latestSensorData = null;
+deje que allSensorsData = {};
 
-app.use(cors());
-app.use(bodyParser.json());
+aplicación.use(cors());
+aplicación.use(bodyParser.json());
 
-function decodeUplink(input){
+función decodeUplink(entrada){
 
-	var decoded_data = {};
-	var decoder = [];
-	var errors = [];
-	var bytes = convertToUint8Array(input.bytes);
-	decoded_data['raw'] = toHexString(bytes).toUpperCase();
-	decoded_data['fPort'] = input.fPort;
+	var datos_decodificados = {};
+	var decodificador = [];
+	var errores = [];
+	var bytes = convertToUint8Array(entrada.bytes);
+	datos_decodificados['raw'] = toHexString(bytes).toUpperCase();
+	datos_decodificados['fPort'] = entrada.fPort;
 
-	if(input.fPort === 101){
-		decoder = [
+	si(entrada.fPuerto === 101){
+		decodificador = [
 			{
-				key: [],
-				fn: function(arg) {
-					var size = arg.length;
-					var invalid_registers = [];
-					var responses = [];
-					while(arg.length > 0){
-						var downlink_fcnt = arg[0];
-						var num_invalid_writes = arg[1];
+				llave: [],
+				fn: función(arg) {
+					var tamaño = arg.longitud;
+					var registros_inválidos = [];
+					var respuestas = [];
+					mientras(arg.length > 0){
+						var enlace descendente_fcnt = arg[0];
+						var num_escrituras_inválidas = arg[1];
 						arg = arg.slice(2);
-						if(num_invalid_writes > 0) {
-							for(var i = 0; i < num_invalid_writes; i++){
-								invalid_registers.push("0x" + arg[i].toString(16));
+						si(num_escrituras_inválidas > 0) {
+							para(var i = 0; i < núm_escrituras_inválidas; i++){
+								registros_inválidos.push("0x" + arg[i].toString(16));
 							}
-							arg = arg.slice(num_invalid_writes);
-							responses.push(num_invalid_writes + ' Invalid write command(s) from DL:' + downlink_fcnt + ' for register(s): ' + invalid_registers);
+							arg = arg.slice(num_escrituras_inválidas);
+							respuestas.push(num_invalid_writes + ' Comando(s) de escritura no válido(s) de DL:' + downlink_fcnt + ' para registro(s): ' + invalid_registers);
 						}
-						else {
-							responses.push('All write commands from DL:' + downlink_fcnt + 'were successfull');
+						demás {
+							responses.push('Todos los comandos de escritura de DL:' + downlink_fcnt + 'fueron exitosos');
 						}
-						invalid_registers = [];
+						registros_inválidos = [];
 					}
-					decoded_data["response"] = responses;
-					return size;
+					decoded_data["response"] = respuestas;
+					tamaño de retorno;
 				}
 			}
 		];
 	}
 
-if (input.fPort === 10) {
-	decoder = [
+si (entrada.fPort === 10) {
+	decodificador = [
 		{
-			key: [0x00, 0xD3],
-			fn: function(arg) {
-				decoded_data['battery_lifetime_pct'] = decode_field(arg, 1, 7, 0, "unsigned");
-				return 1;
+			clave: [0x00, 0xD3],
+			fn: función(arg) {
+				datos_decodificados['tiempo_de_vida_de_la_batería_pct'] = campo_decodificación(arg, 1, 7, 0, "sin signo");
+				devuelve 1;
 			}
 		},
 		{
-			key: [0x00, 0xBD],
-			fn: function(arg) {
-				decoded_data['battery_lifetime_dys'] = decode_field(arg, 2, 15, 0, "unsigned");
-				return 2;
+			clave: [0x00, 0xBD],
+			fn: función(arg) {
+				datos_decodificados['duración_vida_de_la_batería_dys'] = campo_decodificación(arg, 2, 15, 0, "sin signo");
+				devolver 2;
 			}
 		},
 		{
-			key: [0x00, 0x85],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('utc')) {
-					decoded_data['utc'] = {};
+			clave: [0x00, 0x85],
+			fn: función(arg) {
+				si(!datos_decodificados.hasOwnProperty('utc')) {
+					datos_decodificados['utc'] = {};
 				}
-				decoded_data['utc']['year_utc'] = decode_field(arg, 4, 31, 26, "unsigned");
-				decoded_data['utc']['month_utc'] = decode_field(arg, 4, 25, 22, "unsigned");
-				decoded_data['utc']['day_utc'] = decode_field(arg, 4, 21, 17, "unsigned");
-				decoded_data['utc']['hour_utc'] = decode_field(arg, 4, 16, 12, "unsigned");
-				decoded_data['utc']['minute_utc'] = decode_field(arg, 4, 11, 6, "unsigned");
-				decoded_data['utc']['second_utc'] = decode_field(arg, 4, 5, 0, "unsigned");
-				return 4;
+				datos_decodificados['utc']['año_utc'] = campo_decodificación(arg, 4, 31, 26, "sin signo");
+				datos_decodificados['utc']['mes_utc'] = campo_decodificación(arg, 4, 25, 22, "sin signo");
+				datos_decodificados['utc']['día_utc'] = campo_decodificación(arg, 4, 21, 17, "sin signo");
+				datos_decodificados['utc']['hora_utc'] = campo_decodificación(arg, 4, 16, 12, "sin signo");
+				datos_decodificados['utc']['minuto_utc'] = campo_decodificación(arg, 4, 11, 6, "sin signo");
+				datos_decodificados['utc']['segundo_utc'] = campo_decodificación(arg, 4, 5, 0, "sin signo");
+				devolver 4;
 			}
 		},
 		{
-			key: [0x00, 0x88],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('coordinates')) {
-					decoded_data['coordinates'] = {};
+			clave: [0x00, 0x88],
+			fn: función(arg) {
+				if(!decoded_data.hasOwnProperty('coordenadas')) {
+					datos_decodificados['coordenadas'] = {};
 				}
-				decoded_data['coordinates']['latitude'] = (decode_field(arg, 8, 63, 40, "signed") * 0.00001072883606).toFixed(7);
-				decoded_data['coordinates']['longitude'] = (decode_field(arg, 8, 39, 16, "signed") * 0.00002145767212).toFixed(7);
-				decoded_data['coordinates']['altitude'] = (decode_field(arg, 8, 15, 0, "unsigned") * 0.144958496 + -500).toFixed(2);
-				return 8;
+				datos_decodificados['coordenadas']['latitud'] = (campo_decodificado(arg, 8, 63, 40, "signed") * 0.00001072883606).toFixed(7);
+				datos_decodificados['coordenadas']['longitud'] = (campo_decodificación(arg, 8, 39, 16, "signed") * 0.00002145767212).toFixed(7);
+				datos_decodificados['coordenadas']['altitud'] = (campo_decodificación(arg, 8, 15, 0, "sin signo") * 0.144958496 + -500).toFixed(2);
+				devolver 8;
 			}
 		},
 		{
-			key: [0x00, 0x92],
-			fn: function(arg) {
-				decoded_data['ground_speed'] = (decode_field(arg, 1, 7, 0, "unsigned") * 	0.27778 ).toFixed(3);
-				return 1;
+			clave: [0x00, 0x92],
+			fn: función(arg) {
+				datos_decodificados['velocidad_terrestre'] = (campo_decodificación(arg, 1, 7, 0, "sin signo") * 0.27778 ).toFixed(3);
+				devuelve 1;
 			}
 		},
 		{
-			key: [0x00, 0x00],
-			fn: function(arg) {
-				decoded_data['gnss_fix'] = decode_field(arg, 1, 7, 0, "unsigned");
-				return 1;
+			clave: [0x00, 0x00],
+			fn: función(arg) {
+				datos_decodificados['gnss_fix'] = campo_decodificación(arg, 1, 7, 0, "sin signo");
+				devuelve 1;
 			}
 		},
 		{
-			key: [0x00, 0x95],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('gnss_status')) {
-					decoded_data['gnss_status'] = {};
+			clave: [0x00, 0x95],
+			fn: función(arg) {
+				si(!datos_decodificados.hasOwnProperty('gnss_status')) {
+					datos_decodificados['gnss_status'] = {};
 				}
-				var val = decode_field(arg, 1, 1, 0, "unsigned");
-				{switch (val){
-					case 0:
-						decoded_data['gnss_status']['gnss_status_dz0'] = "Unknown";
-						break;
-					case 1:
-						decoded_data['gnss_status']['gnss_status_dz0'] = "Inside";
-						break;
-					case 2:
-						decoded_data['gnss_status']['gnss_status_dz0'] = "Outside";
-						break;
-					default:
-						decoded_data['gnss_status']['gnss_status_dz0'] = "Invalid";
+				var val = decode_field(arg, 1, 1, 0, "sin signo");
+				{cambiar (val){
+					caso 0:
+						datos_decodificados['gnss_status']['gnss_status_dz0'] = "Desconocido";
+						romper;
+					caso 1:
+						datos_decodificados['gnss_status']['gnss_status_dz0'] = "Dentro";
+						romper;
+					caso 2:
+						datos_decodificados['gnss_status']['gnss_status_dz0'] = "Afuera";
+						romper;
+					por defecto:
+						datos_decodificados['gnss_status']['gnss_status_dz0'] = "Inválido";
 				}}
-				var val = decode_field(arg, 1, 3, 2, "unsigned");
-				{switch (val){
-					case 0:
-						decoded_data['gnss_status']['gnss_status_dz1'] = "Unknown";
-						break;
-					case 1:
-						decoded_data['gnss_status']['gnss_status_dz1'] = "Inside";
-						break;
-					case 2:
-						decoded_data['gnss_status']['gnss_status_dz1'] = "Outside";
-						break;
-					default:
-						decoded_data['gnss_status']['gnss_status_dz1'] = "Invalid";
+				var val = decodificar_campo(arg, 1, 3, 2, "sin signo");
+				{cambiar (val){
+					caso 0:
+						datos_decodificados['gnss_status']['gnss_status_dz1'] = "Desconocido";
+						romper;
+					caso 1:
+						datos_decodificados['gnss_status']['gnss_status_dz1'] = "Dentro";
+						romper;
+					caso 2:
+						datos_decodificados['gnss_status']['gnss_status_dz1'] = "Afuera";
+						romper;
+					por defecto:
+						datos_decodificados['gnss_status']['gnss_status_dz1'] = "Inválido";
 				}}
-				var val = decode_field(arg, 1, 5, 4, "unsigned");
-				{switch (val){
-					case 0:
-						decoded_data['gnss_status']['gnss_status_dz2'] = "Unknown";
-						break;
-					case 1:
-						decoded_data['gnss_status']['gnss_status_dz2'] = "Inside";
-						break;
-					case 2:
-						decoded_data['gnss_status']['gnss_status_dz2'] = "Outside";
-						break;
-					default:
-						decoded_data['gnss_status']['gnss_status_dz2'] = "Invalid";
+				var val = decode_field(arg, 1, 5, 4, "sin signo");
+				{cambiar (val){
+					caso 0:
+						datos_decodificados['gnss_status']['gnss_status_dz2'] = "Desconocido";
+						romper;
+					caso 1:
+						datos_decodificados['gnss_status']['gnss_status_dz2'] = "Dentro";
+						romper;
+					caso 2:
+						datos_decodificados['gnss_status']['gnss_status_dz2'] = "Afuera";
+						romper;
+					por defecto:
+						datos_decodificados['gnss_status']['gnss_status_dz2'] = "Inválido";
 				}}
-				var val = decode_field(arg, 1, 7, 6, "unsigned");
-				{switch (val){
-					case 0:
-						decoded_data['gnss_status']['gnss_status_dz3'] = "Unknown";
-						break;
-					case 1:
-						decoded_data['gnss_status']['gnss_status_dz3'] = "Inside";
-						break;
-					case 2:
-						decoded_data['gnss_status']['gnss_status_dz3'] = "Outside";
-						break;
-					default:
-						decoded_data['gnss_status']['gnss_status_dz3'] = "Invalid";
+				var val = decode_field(arg, 1, 7, 6, "sin signo");
+				{cambiar (val){
+					caso 0:
+						datos_decodificados['gnss_status']['gnss_status_dz3'] = "Desconocido";
+						romper;
+					caso 1:
+						datos_decodificados['gnss_status']['gnss_status_dz3'] = "Dentro";
+						romper;
+					caso 2:
+						decoded_data['gnss_status']['gnss_status_dz3'] = "Afuera";
+						romper;
+					por defecto:
+						datos_decodificados['gnss_status']['gnss_status_dz3'] = "Inválido";
 				}}
-				return 1;
+				devuelve 1;
 			}
 		},
 		{
-			key: [0x01, 0x95],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('ble_status')) {
-					decoded_data['ble_status'] = {};
+			clave: [0x01, 0x95],
+			fn: función(arg) {
+				si(!datos_decodificados.hasOwnProperty('ble_status')) {
+					datos_decodificados['ble_status'] = {};
 				}
-				var val = decode_field(arg, 1, 1, 0, "unsigned");
-				{switch (val){
-					case 0:
-						decoded_data['ble_status']['ble_status_dz0'] = "Unknown";
-						break;
-					case 1:
-						decoded_data['ble_status']['ble_status_dz0'] = "Inside";
-						break;
-					case 2:
-						decoded_data['ble_status']['ble_status_dz0'] = "Outside";
-						break;
-					case 3:
-						decoded_data['ble_status']['ble_status_dz0'] = "Near";
-						break;
-					default:
-						decoded_data['ble_status']['ble_status_dz0'] = "Invalid";
+				var val = decode_field(arg, 1, 1, 0, "sin signo");
+				{cambiar (val){
+					caso 0:
+						datos_decodificados['ble_status']['ble_status_dz0'] = "Desconocido";
+						romper;
+					caso 1:
+						datos_decodificados['ble_status']['ble_status_dz0'] = "Dentro";
+						romper;
+					caso 2:
+						datos_decodificados['ble_status']['ble_status_dz0'] = "Afuera";
+						romper;
+					caso 3:
+						datos_decodificados['ble_status']['ble_status_dz0'] = "Cerca";
+						romper;
+					por defecto:
+						datos_decodificados['ble_status']['ble_status_dz0'] = "Inválido";
 				}}
-				var val = decode_field(arg, 1, 3, 2, "unsigned");
-				{switch (val){
-					case 0:
-						decoded_data['ble_status']['ble_status_dz1'] = "Unknown";
-						break;
-					case 1:
-						decoded_data['ble_status']['ble_status_dz1'] = "Inside";
-						break;
-					case 2:
-						decoded_data['ble_status']['ble_status_dz1'] = "Outside";
-						break;
-					case 3:
-						decoded_data['ble_status']['ble_status_dz1'] = "Near";
-						break;
-					default:
-						decoded_data['ble_status']['ble_status_dz1'] = "Invalid";
+				var val = decodificar_campo(arg, 1, 3, 2, "sin signo");
+				{cambiar (val){
+					caso 0:
+						datos_decodificados['ble_status']['ble_status_dz1'] = "Desconocido";
+						romper;
+					caso 1:
+						datos_decodificados['ble_status']['ble_status_dz1'] = "Dentro";
+						romper;
+					caso 2:
+						datos_decodificados['ble_status']['ble_status_dz1'] = "Afuera";
+						romper;
+					caso 3:
+						datos_decodificados['ble_status']['ble_status_dz1'] = "Cerca";
+						romper;
+					por defecto:
+						datos_decodificados['ble_status']['ble_status_dz1'] = "Inválido";
 				}}
-				var val = decode_field(arg, 1, 5, 4, "unsigned");
-				{switch (val){
-					case 0:
-						decoded_data['ble_status']['ble_status_dz2'] = "Unknown";
-						break;
-					case 1:
-						decoded_data['ble_status']['ble_status_dz2'] = "Inside";
-						break;
-					case 2:
-						decoded_data['ble_status']['ble_status_dz2'] = "Outside";
-						break;
-					case 3:
-						decoded_data['ble_status']['ble_status_dz2'] = "Near";
-						break;
-					default:
-						decoded_data['ble_status']['ble_status_dz2'] = "Invalid";
+				var val = decode_field(arg, 1, 5, 4, "sin signo");
+				{cambiar (val){
+					caso 0:
+						datos_decodificados['ble_status']['ble_status_dz2'] = "Desconocido";
+						romper;
+					caso 1:
+						datos_decodificados['ble_status']['ble_status_dz2'] = "Dentro";
+						romper;
+					caso 2:
+						datos_decodificados['ble_status']['ble_status_dz2'] = "Afuera";
+						romper;
+					caso 3:
+						datos_decodificados['ble_status']['ble_status_dz2'] = "Cerca";
+						romper;
+					por defecto:
+						datos_decodificados['ble_status']['ble_status_dz2'] = "Inválido";
 				}}
-				var val = decode_field(arg, 1, 7, 6, "unsigned");
-				{switch (val){
-					case 0:
-						decoded_data['ble_status']['ble_status_dz3'] = "Unknown";
-						break;
-					case 1:
-						decoded_data['ble_status']['ble_status_dz3'] = "Inside";
-						break;
-					case 2:
-						decoded_data['ble_status']['ble_status_dz3'] = "Outside";
-						break;
-					case 3:
-						decoded_data['ble_status']['ble_status_dz3'] = "Near";
-						break;
-					default:
-						decoded_data['ble_status']['ble_status_dz3'] = "Invalid";
+				var val = decode_field(arg, 1, 7, 6, "sin signo");
+				{cambiar (val){
+					caso 0:
+						datos_decodificados['ble_status']['ble_status_dz3'] = "Desconocido";
+						romper;
+					caso 1:
+						datos_decodificados['ble_status']['ble_status_dz3'] = "Dentro";
+						romper;
+					caso 2:
+						datos_decodificados['ble_status']['ble_status_dz3'] = "Afuera";
+						romper;
+					caso 3:
+						datos_decodificados['ble_status']['ble_status_dz3'] = "Cerca";
+						romper;
+					por defecto:
+						datos_decodificados['ble_status']['ble_status_dz3'] = "Inválido";
 				}}
-				return 1;
+				devuelve 1;
 			}
 		},
 		{
-			key: [0x00, 0x73],
-			fn: function(arg) {
-				decoded_data['barometric_pressure'] = (decode_field(arg, 2, 15, 0, "unsigned") * 0.1).toFixed(1);
-				return 2;
+			clave: [0x00, 0x73],
+			fn: función(arg) {
+				datos_decodificados['presión_barométrica'] = (campo_decodificación(arg, 2, 15, 0, "sin signo") * 0.1).toFixed(1);
+				devolver 2;
 			}
 		},
 		{
-			key: [0x00, 0x74],
-			fn: function(arg) {
-				decoded_data['cal_barometric_pressure'] = (decode_field(arg, 2, 15, 0, "unsigned") * 0.1).toFixed(1);
-				return 2;
+			clave: [0x00, 0x74],
+			fn: función(arg) {
+				datos_decodificados['presión_barométrica_cal'] = (campo_decodificación(arg, 2, 15, 0, "sin signo") * 0.1).toFixed(1);
+				devolver 2;
 			}
 		},
 		{
-			key: [0x00, 0x71],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('acceleration_vector')) {
-					decoded_data['acceleration_vector'] = {};
+			clave: [0x00, 0x71],
+			fn: función(arg) {
+				if(!datos_decodificados.hasOwnProperty('vector_de_aceleración')) {
+					datos_decodificados['vector_de_aceleración'] = {};
 				}
-				decoded_data['acceleration_vector']['acceleration_x'] = (decode_field(arg, 6, 47, 32, "signed") * 0.001).toFixed(3);
-				decoded_data['acceleration_vector']['acceleration_y'] = (decode_field(arg, 6, 31, 16, "signed") * 0.001).toFixed(3);
-				decoded_data['acceleration_vector']['acceleration_z'] = (decode_field(arg, 6, 15, 0, "signed") * 0.001).toFixed(3);
-				return 6;
+				datos_decodificados['vector_de_aceleración']['aceleración_x'] = (campo_decodificación(arg, 6, 47, 32, "firmado") * 0.001).toFixed(3);
+				datos_decodificados['vector_de_aceleración']['aceleración_y'] = (campo_decodificación(arg, 6, 31, 16, "firmado") * 0.001).toFixed(3);
+				datos_decodificados['vector_de_aceleración']['aceleración_z'] = (campo_decodificación(arg, 6, 15, 0, "firmado") * 0.001).toFixed(3);
+				devolver 6;
 			}
 		},
 		{
-			key: [0x00, 0x67],
-			fn: function(arg) {
-				decoded_data['temperature'] = (decode_field(arg, 2, 15, 0, "signed") * 0.1).toFixed(1);
-				return 2;
+			clave: [0x00, 0x67],
+			fn: función(arg) {
+				datos_decodificados['temperatura'] = (campo_decodificación(arg, 2, 15, 0, "firmado") * 0.1).toFixed(1);
+				devolver 2;
 			}
 		},
 		{
-			key: [0x02, 0x95],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('safety_status')) {
-					decoded_data['safety_status'] = {};
+			clave: [0x02, 0x95],
+			fn: función(arg) {
+				if(!decoded_data.hasOwnProperty('estado_de_seguridad')) {
+					datos_decodificados['estado_de_seguridad'] = {};
 				}
-				var val = decode_field(arg, 1, 0, 0, "unsigned");
-				{switch (val){
-					case 0:
-						decoded_data['safety_status']['safety_status_eb'] = "Inactive";
-						break;
-					case 1:
-						decoded_data['safety_status']['safety_status_eb'] = "Active";
-						break;
-					default:
-						decoded_data['safety_status']['safety_status_eb'] = "Invalid";
+				var val = decode_field(arg, 1, 0, 0, "sin signo");
+				{cambiar (val){
+					caso 0:
+						decoded_data['safety_status']['safety_status_eb'] = "Inactivo";
+						romper;
+					caso 1:
+						datos_decodificados['estado_de_seguridad']['estado_de_seguridad_eb'] = "Activo";
+						romper;
+					por defecto:
+						datos_decodificados['safety_status']['safety_status_eb'] = "Inválido";
 				}}
-				var val = decode_field(arg, 1, 1, 1, "unsigned");
-				{switch (val){
-					case 0:
-						decoded_data['safety_status']['safety_status_fall'] = "Fall Cleared";
-						break;
-					case 1:
-						decoded_data['safety_status']['safety_status_fall'] = "Active";
-						break;
-					default:
-						decoded_data['safety_status']['safety_status_fall'] = "Invalid";
+				var val = decodificar_campo(arg, 1, 1, 1, "sin signo");
+				{cambiar (val){
+					caso 0:
+						decoded_data['safety_status']['safety_status_fall'] = "Caída despejada";
+						romper;
+					caso 1:
+						datos_decodificados['estado_de_seguridad']['estado_de_seguridad_fall'] = "Activo";
+						romper;
+					por defecto:
+						datos_decodificados['safety_status']['safety_status_fall'] = "Inválido";
 				}}
-				var val = decode_field(arg, 1, 2, 2, "unsigned");
-				{switch (val){
-					case 0:
-						decoded_data['safety_status']['safety_status_sh'] = "Off";
-						break;
-					case 1:
-						decoded_data['safety_status']['safety_status_sh'] = "On";
-						break;
-					default:
-						decoded_data['safety_status']['safety_status_sh'] = "Invalid";
+				var val = decodificar_campo(arg, 1, 2, 2, "sin signo");
+				{cambiar (val){
+					caso 0:
+						datos_decodificados['safety_status']['safety_status_sh'] = "Desactivado";
+						romper;
+					caso 1:
+						datos_decodificados['estado_de_seguridad']['estado_de_seguridad_sh'] = "Activado";
+						romper;
+					por defecto:
+						datos_decodificados['safety_status']['safety_status_sh'] = "Inválido";
 				}}
-				var val = decode_field(arg, 1, 3, 3, "unsigned");
-				{switch (val){
-					case 0:
-						decoded_data['safety_status']['safety_status_ear'] = "Inactive";
-						break;
-					case 1:
-						decoded_data['safety_status']['safety_status_ear'] = "Active";
-						break;
-					default:
-						decoded_data['safety_status']['safety_status_ear'] = "Invalid";
+				var val = decodificar_campo(arg, 1, 3, 3, "sin signo");
+				{cambiar (val){
+					caso 0:
+						decoded_data['safety_status']['safety_status_ear'] = "Inactivo";
+						romper;
+					caso 1:
+						datos_decodificados['estado_de_seguridad']['estado_de_seguridad_ear'] = "Activo";
+						romper;
+					por defecto:
+						datos_decodificados['safety_status']['safety_status_ear'] = "Inválido";
 				}}
-				var val = decode_field(arg, 1, 4, 4, "unsigned");
-				{switch (val){
-					case 0:
-						decoded_data['safety_status']['safety_status_pressure'] = "Inactive";
-						break;
-					case 1:
-						decoded_data['safety_status']['safety_status_pressure'] = "Active";
-						break;
-					default:
-						decoded_data['safety_status']['safety_status_pressure'] = "Invalid";
+				var val = decode_field(arg, 1, 4, 4, "sin signo");
+				{cambiar (val){
+					caso 0:
+						decoded_data['safety_status']['safety_status_pressure'] = "Inactivo";
+						romper;
+					caso 1:
+						datos_decodificados['estado_de_seguridad']['estado_de_seguridad_presión'] = "Activo";
+						romper;
+					por defecto:
+						datos_decodificados['safety_status']['safety_status_pressure'] = "Inválido";
 				}}
-				return 1;
+				devuelve 1;
 			}
 		},
 	];
 }
-if (input.fPort === 25) {
-	decoder = [
+si (entrada.fPort === 25) {
+	decodificador = [
 		{
-			key: [0x0A],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('ble_1')) {
-					decoded_data['ble_1'] = {};
+			clave: [0x0A],
+			fn: función(arg) {
+				si(!datos_decodificados.hasOwnProperty('ble_1')) {
+					datos_decodificados['ble_1'] = {};
 				}
-					var data = [];
-					var loop = arg.length / 7;
-					for (var i = 0; i < loop; i++) {
-						var group = {};
-						group['id_01'] = decode_field(arg, 7, 55, 8, "hexstring");
-						group['rssi_01'] = decode_field(arg, 7, 7, 0, "signed");
-						data.push(group);
+					var datos = [];
+					var bucle = arg.longitud / 7;
+					para (var i = 0; i < bucle; i++) {
+						var grupo = {};
+						grupo['id_01'] = campo_decodificación(arg, 7, 55, 8, "cadena hexadecimal");
+						grupo['rssi_01'] = campo_decodificación(arg, 7, 7, 0, "firmado");
+						datos.push(grupo);
 						arg = arg.slice(7);
 					}
-					decoded_data['ble_1'] = data;
-					return loop*7;
+					datos_decodificados['ble_1'] = datos;
+					bucle de retorno*7;
 			}
 		},
 		{
-			key: [0xB0],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('ble_2')) {
-					decoded_data['ble_2'] = {};
+			clave: [0xB0],
+			fn: función(arg) {
+				si(!datos_decodificados.hasOwnProperty('ble_2')) {
+					datos_decodificados['ble_2'] = {};
 				}
-					var data = [];
-					var loop = arg.length / 7;
-					for (var i = 0; i < loop; i++) {
-						var group = {};
-						group['id_02'] = decode_field(arg, 7, 55, 8, "hexstring");
-						group['rssi_02'] = decode_field(arg, 7, 7, 0, "signed");
-						data.push(group);
+					var datos = [];
+					var bucle = arg.longitud / 7;
+					para (var i = 0; i < bucle; i++) {
+						var grupo = {};
+						grupo['id_02'] = campo_decodificación(arg, 7, 55, 8, "cadena hexadecimal");
+						grupo['rssi_02'] = campo_decodificación(arg, 7, 7, 0, "firmado");
+						datos.push(grupo);
 						arg = arg.slice(7);
 					}
-					decoded_data['ble_2'] = data;
-					return loop*7;
+					datos_decodificados['ble_2'] = datos;
+					bucle de retorno*7;
 			}
 		},
 		{
-			key: [0xB1],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('ble_3')) {
-					decoded_data['ble_3'] = {};
+			clave: [0xB1],
+			fn: función(arg) {
+				si(!datos_decodificados.hasOwnProperty('ble_3')) {
+					datos_decodificados['ble_3'] = {};
 				}
-					var data = [];
-					var loop = arg.length / 7;
-					for (var i = 0; i < loop; i++) {
-						var group = {};
-						group['id_03'] = decode_field(arg, 7, 55, 8, "hexstring");
-						group['rssi_03'] = decode_field(arg, 7, 7, 0, "signed");
-						data.push(group);
+					var datos = [];
+					var bucle = arg.longitud / 7;
+					para (var i = 0; i < bucle; i++) {
+						var grupo = {};
+						grupo['id_03'] = campo_decodificación(arg, 7, 55, 8, "cadena hexadecimal");
+						grupo['rssi_03'] = campo_decodificación(arg, 7, 7, 0, "firmado");
+						datos.push(grupo);
 						arg = arg.slice(7);
 					}
-					decoded_data['ble_3'] = data;
-					return loop*7;
+					datos_decodificados['ble_3'] = datos;
+					bucle de retorno*7;
 			}
 		},
 		{
-			key: [0xB2],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('ble_4')) {
-					decoded_data['ble_4'] = {};
+			clave: [0xB2],
+			fn: función(arg) {
+				si(!datos_decodificados.hasOwnProperty('ble_4')) {
+					datos_decodificados['ble_4'] = {};
 				}
-					var data = [];
-					var loop = arg.length / 7;
-					for (var i = 0; i < loop; i++) {
-						var group = {};
-						group['id_04'] = decode_field(arg, 7, 55, 8, "hexstring");
-						group['rssi_04'] = decode_field(arg, 7, 7, 0, "signed");
-						data.push(group);
+					var datos = [];
+					var bucle = arg.longitud / 7;
+					para (var i = 0; i < bucle; i++) {
+						var grupo = {};
+						grupo['id_04'] = campo_decodificación(arg, 7, 55, 8, "cadena hexadecimal");
+						grupo['rssi_04'] = campo_decodificación(arg, 7, 7, 0, "firmado");
+						datos.push(grupo);
 						arg = arg.slice(7);
 					}
-					decoded_data['ble_4'] = data;
-					return loop*7;
+					datos_decodificados['ble_4'] = datos;
+					bucle de retorno*7;
 			}
 		},
 		{
-			key: [0xB3],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('ble_5')) {
-					decoded_data['ble_5'] = {};
+			clave: [0xB3],
+			fn: función(arg) {
+				si(!datos_decodificados.hasOwnProperty('ble_5')) {
+					datos_decodificados['ble_5'] = {};
 				}
-					var data = [];
-					var loop = arg.length / 7;
-					for (var i = 0; i < loop; i++) {
-						var group = {};
-						group['id_05'] = decode_field(arg, 7, 55, 8, "hexstring");
-						group['rssi_05'] = decode_field(arg, 7, 7, 0, "signed");
-						data.push(group);
+					var datos = [];
+					var bucle = arg.longitud / 7;
+					para (var i = 0; i < bucle; i++) {
+						var grupo = {};
+						grupo['id_05'] = campo_decodificación(arg, 7, 55, 8, "cadena hexadecimal");
+						grupo['rssi_05'] = campo_decodificación(arg, 7, 7, 0, "firmado");
+						datos.push(grupo);
 						arg = arg.slice(7);
 					}
-					decoded_data['ble_5'] = data;
-					return loop*7;
+					datos_decodificados['ble_5'] = datos;
+					bucle de retorno*7;
 			}
 		},
 	];
 }
-if (input.fPort === 100) {
-	decoder = [
+si (entrada.fPort === 100) {
+	decodificador = [
 		{
-			key: [0x10],
-			fn: function(arg) {
-				var val = decode_field(arg, 2, 15, 15, "unsigned");
-				{switch (val){
-					case 0:
-						decoded_data['join_mode'] = "ABP";
-						break;
-					case 1:
+			clave: [0x10],
+			fn: función(arg) {
+				var val = decode_field(arg, 2, 15, 15, "sin signo");
+				{cambiar (val){
+					caso 0:
+						datos_decodificados['modo_de_unión'] = "ABP";
+						romper;
+					caso 1:
 						decoded_data['join_mode'] = "OTAA";
-						break;
-					default:
-						decoded_data['join_mode'] = "Invalid";
+						romper;
+					por defecto:
+						decoded_data['join_mode'] = "Inválido";
 				}}
-				return 2;
+				devolver 2;
 			}
 		},
 		{
-			key: [0x11],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('loramac_opts')) {
-					decoded_data['loramac_opts'] = {};
+			clave: [0x11],
+			fn: función(arg) {
+				si(!datos_decodificados.hasOwnProperty('loramac_opts')) {
+					datos_decodificados['loramac_opts'] = {};
 				}
-				var val = decode_field(arg, 2, 3, 3, "unsigned");
-				{switch (val){
-					case 0:
-						decoded_data['loramac_opts']['loramac_adr'] = "Disable";
-						break;
-					case 1:
-						decoded_data['loramac_opts']['loramac_adr'] = "Enable";
-						break;
-					default:
-						decoded_data['loramac_opts']['loramac_adr'] = "Invalid";
+				var val = decodificar_campo(arg, 2, 3, 3, "sin signo");
+				{cambiar (val){
+					caso 0:
+						decoded_data['loramac_opts']['loramac_adr'] = "Deshabilitar";
+						romper;
+					caso 1:
+						decoded_data['loramac_opts']['loramac_adr'] = "Habilitar";
+						romper;
+					por defecto:
+						datos_decodificados['loramac_opts']['loramac_adr'] = "Inválido";
 				}}
-				var val = decode_field(arg, 2, 2, 2, "unsigned");
-				{switch (val){
-					case 0:
-						decoded_data['loramac_opts']['loramac_duty_cycle'] = "Disable";
-						break;
-					case 1:
-						decoded_data['loramac_opts']['loramac_duty_cycle'] = "Enable";
-						break;
-					default:
-						decoded_data['loramac_opts']['loramac_duty_cycle'] = "Invalid";
+				var val = decodificar_campo(arg, 2, 2, 2, "sin signo");
+				{cambiar (val){
+					caso 0:
+						datos_decodificados['loramac_opts']['loramac_duty_cycle'] = "Deshabilitar";
+						romper;
+					caso 1:
+						datos_decodificados['loramac_opts']['loramac_duty_cycle'] = "Habilitar";
+						romper;
+					por defecto:
+						datos_decodificados['loramac_opts']['loramac_duty_cycle'] = "Inválido";
 				}}
-				var val = decode_field(arg, 2, 1, 1, "unsigned");
-				{switch (val){
-					case 0:
-						decoded_data['loramac_opts']['loramac_ul_type'] = "Private";
-						break;
-					case 1:
-						decoded_data['loramac_opts']['loramac_ul_type'] = "Public";
-						break;
-					default:
-						decoded_data['loramac_opts']['loramac_ul_type'] = "Invalid";
+				var val = decodificar_campo(arg, 2, 1, 1, "sin signo");
+				{cambiar (val){
+					caso 0:
+						datos_decodificados['loramac_opts']['loramac_ul_type'] = "Privado";
+						romper;
+					caso 1:
+						datos_decodificados['loramac_opts']['loramac_ul_type'] = "Público";
+						romper;
+					por defecto:
+						datos_decodificados['loramac_opts']['loramac_ul_type'] = "Inválido";
 				}}
-				var val = decode_field(arg, 2, 0, 0, "unsigned");
-				{switch (val){
-					case 0:
-						decoded_data['loramac_opts']['loramac_confirmed'] = "Unconfirmed";
-						break;
-					case 1:
-						decoded_data['loramac_opts']['loramac_confirmed'] = "Confirmed";
-						break;
-					default:
-						decoded_data['loramac_opts']['loramac_confirmed'] = "Invalid";
+				var val = decode_field(arg, 2, 0, 0, "sin signo");
+				{cambiar (val){
+					caso 0:
+						decoded_data['loramac_opts']['loramac_confirmed'] = "Sin confirmar";
+						romper;
+					caso 1:
+						decoded_data['loramac_opts']['loramac_confirmed'] = "Confirmado";
+						romper;
+					por defecto:
+						datos_decodificados['loramac_opts']['loramac_confirmed'] = "Inválido";
 				}}
-				return 2;
+				devolver 2;
 			}
 		},
 		{
-			key: [0x12],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('loramac_dr_tx')) {
-					decoded_data['loramac_dr_tx'] = {};
+			clave: [0x12],
+			fn: función(arg) {
+				si(!datos_decodificados.hasOwnProperty('loramac_dr_tx')) {
+					datos_decodificados['loramac_dr_tx'] = {};
 				}
-				decoded_data['loramac_dr_tx']['loramac_default_dr'] = decode_field(arg, 2, 11, 8, "unsigned");
-				decoded_data['loramac_dr_tx']['loramac_default_tx_pwr'] = decode_field(arg, 2, 3, 0, "unsigned");
-				return 2;
+				datos_decodificados['loramac_dr_tx']['loramac_default_dr'] = campo_decodificación(arg, 2, 11, 8, "sin signo");
+				datos_decodificados['loramac_dr_tx']['loramac_default_tx_pwr'] = campo_decodificación(arg, 2, 3, 0, "sin signo");
+				devolver 2;
 			}
 		},
 		{
-			key: [0x13],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('loramac_rx2')) {
-					decoded_data['loramac_rx2'] = {};
+			clave: [0x13],
+			fn: función(arg) {
+				si(!datos_decodificados.hasOwnProperty('loramac_rx2')) {
+					datos_decodificados['loramac_rx2'] = {};
 				}
-				decoded_data['loramac_rx2']['loramac_rx2_freq'] = decode_field(arg, 5, 39, 8, "unsigned");
-				decoded_data['loramac_rx2']['loramac_rx2_dr'] = decode_field(arg, 5, 7, 0, "unsigned");
-				return 5;
+				datos_decodificados['loramac_rx2']['loramac_rx2_freq'] = campo_decodificación(arg, 5, 39, 8, "sin signo");
+				datos_decodificados['loramac_rx2']['loramac_rx2_dr'] = campo_decodificación(arg, 5, 7, 0, "sin signo");
+				devolver 5;
 			}
 		},
 		{
-			key: [0x20],
-			fn: function(arg) {
-				decoded_data['seconds_per_core_tick'] = decode_field(arg, 4, 31, 0, "unsigned");
-				return 4;
+			clave: [0x20],
+			fn: función(arg) {
+				datos_decodificados['segundos_por_tick_de_núcleo'] = campo_decodificación(arg, 4, 31, 0, "sin signo");
+				devolver 4;
 			}
 		},
 		{
-			key: [0x21],
-			fn: function(arg) {
-				decoded_data['ticks_battery'] = decode_field(arg, 2, 15, 0, "unsigned");
-				return 2;
+			clave: [0x21],
+			fn: función(arg) {
+				datos_decodificados['batería_ticks'] = campo_decodificación(arg, 2, 15, 0, "sin signo");
+				devolver 2;
 			}
 		},
 		{
-			key: [0x22],
-			fn: function(arg) {
-				decoded_data['ticks_normal_state'] = decode_field(arg, 2, 15, 0, "unsigned");
-				return 2;
+			clave: [0x22],
+			fn: función(arg) {
+				datos_decodificados['ticks_normal_state'] = campo_decodificación(arg, 2, 15, 0, "sin signo");
+				devolver 2;
 			}
 		},
 		{
-			key: [0x23],
-			fn: function(arg) {
-				decoded_data['ticks_emergency_state'] = decode_field(arg, 2, 15, 0, "unsigned");
-				return 2;
+			clave: [0x23],
+			fn: función(arg) {
+				datos_decodificados['ticks_emergency_state'] = campo_decodificación(arg, 2, 15, 0, "sin signo");
+				devolver 2;
 			}
 		},
 		{
-			key: [0x24],
-			fn: function(arg) {
-				decoded_data['ticks_accelerometer'] = decode_field(arg, 2, 15, 0, "unsigned");
-				return 2;
+			clave: [0x24],
+			fn: función(arg) {
+				datos_decodificados['ticks_accelerómetro'] = campo_decodificación(arg, 2, 15, 0, "sin signo");
+				devolver 2;
 			}
 		},
 		{
-			key: [0x25],
-			fn: function(arg) {
-				decoded_data['ticks_temperature'] = decode_field(arg, 2, 15, 0, "unsigned");
-				return 2;
+			clave: [0x25],
+			fn: función(arg) {
+				datos_decodificados['temperatura_ticks'] = campo_decodificación(arg, 2, 15, 0, "sin signo");
+				devolver 2;
 			}
 		},
 		{
-			key: [0x26],
-			fn: function(arg) {
-				decoded_data['ticks_safety_status_normal'] = decode_field(arg, 2, 15, 0, "unsigned");
-				return 2;
+			clave: [0x26],
+			fn: función(arg) {
+				datos_decodificados['ticks_safety_status_normal'] = campo_decodificación(arg, 2, 15, 0, "sin signo");
+				devolver 2;
 			}
 		},
 		{
-			key: [0x27],
-			fn: function(arg) {
-				decoded_data['ticks_pressure'] = decode_field(arg, 2, 15, 0, "unsigned");
-				return 2;
+			clave: [0x27],
+			fn: función(arg) {
+				datos_decodificados['ticks_pressure'] = campo_decodificación(arg, 2, 15, 0, "sin signo");
+				devolver 2;
 			}
 		},
 		{
-			key: [0x28],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('eb_active_buzz_config')) {
-					decoded_data['eb_active_buzz_config'] = {};
+			clave: [0x28],
+			fn: función(arg) {
+				si(!datos_decodificados.hasOwnProperty('eb_active_buzz_config')) {
+					datos_decodificados['eb_active_buzz_config'] = {};
 				}
-				decoded_data['eb_active_buzz_config']['eb_buzz_active_on_time'] = (decode_field(arg, 3, 23, 16, "unsigned") * 0.1).toFixed(1);
-				decoded_data['eb_active_buzz_config']['eb_buzz_active_off_time'] = (decode_field(arg, 3, 15, 8, "unsigned") * 0.1).toFixed(1);
-				decoded_data['eb_active_buzz_config']['eb_buzz_active_num_on_offs'] = decode_field(arg, 3, 7, 0, "unsigned");
-				return 3;
+				datos_decodificados['eb_active_buzz_config']['eb_buzz_active_on_time'] = (campo_decodificación(arg, 3, 23, 16, "sin signo") * 0.1).toFixed(1);
+				datos_decodificados['eb_active_buzz_config']['eb_buzz_active_off_time'] = (campo_decodificación(arg, 3, 15, 8, "sin signo") * 0.1).toFixed(1);
+				datos_decodificados['eb_active_buzz_config']['eb_buzz_active_num_on_offs'] = campo_decodificación(arg, 3, 7, 0, "sin signo");
+				devolver 3;
 			}
 		},
 		{
-			key: [0x29],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('eb_inactive_buzz_config')) {
-					decoded_data['eb_inactive_buzz_config'] = {};
+			clave: [0x29],
+			fn: función(arg) {
+				si(!datos_decodificados.hasOwnProperty('eb_inactive_buzz_config')) {
+					datos_decodificados['eb_inactive_buzz_config'] = {};
 				}
-				decoded_data['eb_inactive_buzz_config']['eb_buzz_inactive_on_time'] = (decode_field(arg, 3, 23, 16, "unsigned") * 0.1).toFixed(1);
-				decoded_data['eb_inactive_buzz_config']['eb_buzz_inactive_off_time'] = (decode_field(arg, 3, 15, 8, "unsigned") * 0.1).toFixed(1);
-				decoded_data['eb_inactive_buzz_config']['eb_buzz_inactive_num_on_offs'] = decode_field(arg, 3, 7, 0, "unsigned");
-				return 3;
+				datos_decodificados['eb_inactive_buzz_config']['eb_buzz_inactive_on_time'] = (campo_decodificación(arg, 3, 23, 16, "sin signo") * 0.1).toFixed(1);
+				datos_decodificados['eb_inactive_buzz_config']['eb_buzz_inactive_off_time'] = (campo_decodificación(arg, 3, 15, 8, "sin signo") * 0.1).toFixed(1);
+				datos_decodificados['eb_inactive_buzz_config']['eb_buzz_inactive_num_on_offs'] = campo_decodificación(arg, 3, 7, 0, "sin signo");
+				devolver 3;
 			}
 		},
 		{
-			key: [0x2C],
-			fn: function(arg) {
-				decoded_data['sh_debounce_interval'] = decode_field(arg, 1, 7, 0, "unsigned");
-				return 1;
+			clave: [0x2C],
+			fn: función(arg) {
+				datos_decodificados['sh_debounce_interval'] = campo_decodificación(arg, 1, 7, 0, "sin signo");
+				devuelve 1;
 			}
 		},
 		{
-			key: [0x2D],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('sh_buzz_config')) {
-					decoded_data['sh_buzz_config'] = {};
+			clave: [0x2D],
+			fn: función(arg) {
+				si(!datos_decodificados.hasOwnProperty('sh_buzz_config')) {
+					datos_decodificados['sh_buzz_config'] = {};
 				}
-				decoded_data['sh_buzz_config']['sh_buzz_when_to'] = decode_field(arg, 5, 33, 32, "hexstring");
-				decoded_data['sh_buzz_config']['sh_buzz_on_time'] = (decode_field(arg, 5, 31, 24, "unsigned") * 0.1).toFixed(1);
-				decoded_data['sh_buzz_config']['sh_buzz_off_time'] = (decode_field(arg, 5, 23, 16, "unsigned") * 0.1).toFixed(1);
-				decoded_data['sh_buzz_config']['sh_buzz_num_on_offs'] = decode_field(arg, 5, 15, 8, "unsigned");
-				decoded_data['sh_buzz_config']['sh_buzz_period'] = (decode_field(arg, 5, 7, 0, "unsigned") * 0.1).toFixed(1);
-				return 5;
+				datos_decodificados['sh_buzz_config']['sh_buzz_when_to'] = campo_decodificación(arg, 5, 33, 32, "cadena hexadecimal");
+				datos_decodificados['sh_buzz_config']['sh_buzz_on_time'] = (campo_decodificación(arg, 5, 31, 24, "sin signo") * 0.1).toFixed(1);
+				datos_decodificados['sh_buzz_config']['sh_buzz_off_time'] = (campo_decodificación(arg, 5, 23, 16, "sin signo") * 0.1).toFixed(1);
+				datos_decodificados['sh_buzz_config']['sh_buzz_num_on_offs'] = campo_decodificación(arg, 5, 15, 8, "sin signo");
+				datos_decodificados['sh_buzz_config']['sh_buzz_period'] = (campo_decodificación(arg, 5, 7, 0, "sin signo") * 0.1).toFixed(1);
+				devolver 5;
 			}
 		},
 		{
-			key: [0x30],
-			fn: function(arg) {
-				var val = decode_field(arg, 1, 7, 7, "unsigned");
-				{switch (val){
-					case 0:
-						decoded_data['gnss_receiver'] = "Disabled";
-						break;
-					case 1:
-						decoded_data['gnss_receiver'] = "Enabled";
-						break;
-					default:
-						decoded_data['gnss_receiver'] = "Invalid";
+			clave: [0x30],
+			fn: función(arg) {
+				var val = decode_field(arg, 1, 7, 7, "sin signo");
+				{cambiar (val){
+					caso 0:
+						decoded_data['gnss_receiver'] = "Deshabilitado";
+						romper;
+					caso 1:
+						decoded_data['gnss_receiver'] = "Habilitado";
+						romper;
+					por defecto:
+						decoded_data['gnss_receiver'] = "Inválido";
 				}}
-				return 1;
+				devuelve 1;
 			}
 		},
 		{
-			key: [0x31],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('gnss_report_options')) {
-					decoded_data['gnss_report_options'] = {};
+			clave: [0x31],
+			fn: función(arg) {
+				if(!datos_decodificados.hasOwnProperty('opciones_del_informe_gnss')) {
+					datos_decodificados['opciones_del_informe_gnss'] = {};
 				}
-				var val = decode_field(arg, 1, 2, 2, "unsigned");
-				{switch (val){
-					case 0:
-						decoded_data['gnss_report_options']['gnss_dz_status_report'] = "Disabled";
-						break;
-					case 1:
-						decoded_data['gnss_report_options']['gnss_dz_status_report'] = "Enabled";
-						break;
-					default:
-						decoded_data['gnss_report_options']['gnss_dz_status_report'] = "Invalid";
+				var val = decodificar_campo(arg, 1, 2, 2, "sin signo");
+				{cambiar (val){
+					caso 0:
+						datos_decodificados['gnss_report_options']['gnss_dz_status_report'] = "Deshabilitado";
+						romper;
+					caso 1:
+						datos_decodificados['gnss_report_options']['gnss_dz_status_report'] = "Habilitado";
+						romper;
+					por defecto:
+						datos_decodificados['gnss_report_options']['gnss_dz_status_report'] = "Inválido";
 				}}
-				var val = decode_field(arg, 1, 1, 1, "unsigned");
-				{switch (val){
-					case 0:
-						decoded_data['gnss_report_options']['gnss_ground_speed_report'] = "Disabled";
-						break;
-					case 1:
-						decoded_data['gnss_report_options']['gnss_ground_speed_report'] = "Enabled";
-						break;
-					default:
-						decoded_data['gnss_report_options']['gnss_ground_speed_report'] = "Invalid";
+				var val = decodificar_campo(arg, 1, 1, 1, "sin signo");
+				{cambiar (val){
+					caso 0:
+						datos_decodificados['gnss_report_options']['gnss_ground_speed_report'] = "Deshabilitado";
+						romper;
+					caso 1:
+						datos_decodificados['gnss_report_options']['gnss_ground_speed_report'] = "Habilitado";
+						romper;
+					por defecto:
+						datos_decodificados['gnss_report_options']['gnss_ground_speed_report'] = "Inválido";
 				}}
-				var val = decode_field(arg, 1, 0, 0, "unsigned");
-				{switch (val){
-					case 0:
-						decoded_data['gnss_report_options']['gnss_utc_coordinates_report'] = "Disabled";
-						break;
-					case 1:
-						decoded_data['gnss_report_options']['gnss_utc_coordinates_report'] = "Enabled";
-						break;
-					default:
-						decoded_data['gnss_report_options']['gnss_utc_coordinates_report'] = "Invalid";
+				var val = decode_field(arg, 1, 0, 0, "sin signo");
+				{cambiar (val){
+					caso 0:
+						datos_decodificados['gnss_report_options']['gnss_utc_coordinates_report'] = "Deshabilitado";
+						romper;
+					caso 1:
+						datos_decodificados['gnss_report_options']['gnss_utc_coordinates_report'] = "Habilitado";
+						romper;
+					por defecto:
+						datos_decodificados['gnss_report_options']['gnss_utc_coordinates_report'] = "Inválido";
 				}}
-				return 1;
+				devuelve 1;
 			}
 		},
 		{
-			key: [0x32],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('gnss_dz0')) {
-					decoded_data['gnss_dz0'] = {};
+			clave: [0x32],
+			fn: función(arg) {
+				si(!datos_decodificados.hasOwnProperty('gnss_dz0')) {
+					datos_decodificados['gnss_dz0'] = {};
 				}
-				decoded_data['gnss_dz0']['gnss_dz0_latitude'] = (decode_field(arg, 8, 63, 40, "signed") * 0.00001072883606).toFixed(7);
-				decoded_data['gnss_dz0']['gnss_dz0_longitude'] = (decode_field(arg, 8, 39, 16, "signed") * 0.00002145767212).toFixed(7);
-				decoded_data['gnss_dz0']['gnss_dz0_radius'] = (decode_field(arg, 8, 15, 0, "signed") * 10).toFixed(1);
-				return 8;
+				datos_decodificados['gnss_dz0']['gnss_dz0_latitud'] = (campo_decodificación(arg, 8, 63, 40, "firmado") * 0.00001072883606).toFixed(7);
+				datos_decodificados['gnss_dz0']['gnss_dz0_longitud'] = (campo_decodificación(arg, 8, 39, 16, "firmado") * 0.00002145767212).toFixed(7);
+				datos_decodificados['gnss_dz0']['gnss_dz0_radius'] = (campo_decodificación(arg, 8, 15, 0, "firmado") * 10).toFixed(1);
+				devolver 8;
 			}
 		},
 		{
-			key: [0x33],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('gnss_dz1')) {
-					decoded_data['gnss_dz1'] = {};
+			clave: [0x33],
+			fn: función(arg) {
+				si(!datos_decodificados.hasOwnProperty('gnss_dz1')) {
+					datos_decodificados['gnss_dz1'] = {};
 				}
-				decoded_data['gnss_dz1']['gnss_dz1_latitude'] = (decode_field(arg, 8, 63, 40, "signed") * 0.00001072883606).toFixed(7);
-				decoded_data['gnss_dz1']['gnss_dz1_longitude'] = (decode_field(arg, 8, 39, 16, "signed") * 0.00002145767212).toFixed(7);
-				decoded_data['gnss_dz1']['gnss_dz1_radius'] = (decode_field(arg, 8, 15, 0, "signed") * 10).toFixed(1);
-				return 8;
+				datos_decodificados['gnss_dz1']['gnss_dz1_latitud'] = (campo_decodificación(arg, 8, 63, 40, "firmado") * 0.00001072883606).toFixed(7);
+				datos_decodificados['gnss_dz1']['gnss_dz1_longitud'] = (campo_decodificación(arg, 8, 39, 16, "firmado") * 0.00002145767212).toFixed(7);
+				datos_decodificados['gnss_dz1']['gnss_dz1_radius'] = (campo_decodificación(arg, 8, 15, 0, "firmado") * 10).toFixed(1);
+				devolver 8;
 			}
 		},
 		{
-			key: [0x34],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('gnss_dz2')) {
-					decoded_data['gnss_dz2'] = {};
+			clave: [0x34],
+			fn: función(arg) {
+				si(!datos_decodificados.hasOwnProperty('gnss_dz2')) {
+					datos_decodificados['gnss_dz2'] = {};
 				}
-				decoded_data['gnss_dz2']['gnss_dz2_latitude'] = (decode_field(arg, 8, 63, 40, "signed") * 0.00001072883606).toFixed(7);
-				decoded_data['gnss_dz2']['gnss_dz2_longitude'] = (decode_field(arg, 8, 39, 16, "signed") * 0.00002145767212).toFixed(7);
-				decoded_data['gnss_dz2']['gnss_dz2_radius'] = (decode_field(arg, 8, 15, 0, "signed") * 10).toFixed(1);
-				return 8;
+				datos_decodificados['gnss_dz2']['gnss_dz2_latitud'] = (campo_decodificación(arg, 8, 63, 40, "firmado") * 0.00001072883606).toFixed(7);
+				datos_decodificados['gnss_dz2']['gnss_dz2_longitud'] = (campo_decodificación(arg, 8, 39, 16, "firmado") * 0.00002145767212).toFixed(7);
+				datos_decodificados['gnss_dz2']['gnss_dz2_radius'] = (campo_decodificación(arg, 8, 15, 0, "firmado") * 10).toFixed(1);
+				devolver 8;
 			}
 		},
 		{
-			key: [0x35],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('gnss_dz3')) {
-					decoded_data['gnss_dz3'] = {};
+			clave: [0x35],
+			fn: función(arg) {
+				si(!datos_decodificados.hasOwnProperty('gnss_dz3')) {
+					datos_decodificados['gnss_dz3'] = {};
 				}
-				decoded_data['gnss_dz3']['gnss_dz3_latitude'] = (decode_field(arg, 8, 63, 40, "signed") * 0.00001072883606).toFixed(7);
-				decoded_data['gnss_dz3']['gnss_dz3_longitude'] = (decode_field(arg, 8, 39, 16, "signed") * 0.00002145767212).toFixed(7);
-				decoded_data['gnss_dz3']['gnss_dz3_radius'] = (decode_field(arg, 8, 15, 0, "signed") * 10).toFixed(1);
-				return 8;
+				datos_decodificados['gnss_dz3']['gnss_dz3_latitud'] = (campo_decodificación(arg, 8, 63, 40, "firmado") * 0.00001072883606).toFixed(7);
+				datos_decodificados['gnss_dz3']['gnss_dz3_longitud'] = (campo_decodificación(arg, 8, 39, 16, "firmado") * 0.00002145767212).toFixed(7);
+				datos_decodificados['gnss_dz3']['gnss_dz3_radius'] = (campo_decodificación(arg, 8, 15, 0, "firmado") * 10).toFixed(1);
+				devolver 8;
 			}
 		},
 		{
-			key: [0x36],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('gnss_diagnostics_tx')) {
-					decoded_data['gnss_diagnostics_tx'] = {};
+			clave: [0x36],
+			fn: función(arg) {
+				si(!datos_decodificados.hasOwnProperty('gnss_diagnostics_tx')) {
+					datos_decodificados['gnss_diagnostics_tx'] = {};
 				}
-				var val = decode_field(arg, 1, 0, 0, "unsigned");
-				{switch (val){
-					case 0:
-						decoded_data['gnss_diagnostics_tx']['num_of_sats'] = "Disabled";
-						break;
-					case 1:
-						decoded_data['gnss_diagnostics_tx']['num_of_sats'] = "Enabled";
-						break;
-					default:
-						decoded_data['gnss_diagnostics_tx']['num_of_sats'] = "Invalid";
+				var val = decode_field(arg, 1, 0, 0, "sin signo");
+				{cambiar (val){
+					caso 0:
+						datos_decodificados['gnss_diagnostics_tx']['num_of_sats'] = "Deshabilitado";
+						romper;
+					caso 1:
+						datos_decodificados['gnss_diagnostics_tx']['num_of_sats'] = "Habilitado";
+						romper;
+					por defecto:
+						datos_decodificados['gnss_diagnostics_tx']['num_of_sats'] = "Inválido";
 				}}
-				var val = decode_field(arg, 1, 1, 1, "unsigned");
-				{switch (val){
-					case 0:
-						decoded_data['gnss_diagnostics_tx']['avg_sat_snr'] = "Disabled";
-						break;
-					case 1:
-						decoded_data['gnss_diagnostics_tx']['avg_sat_snr'] = "Enabled";
-						break;
-					default:
-						decoded_data['gnss_diagnostics_tx']['avg_sat_snr'] = "Invalid";
+				var val = decodificar_campo(arg, 1, 1, 1, "sin signo");
+				{cambiar (val){
+					caso 0:
+						datos_decodificados['gnss_diagnostics_tx']['avg_sat_snr'] = "Deshabilitado";
+						romper;
+					caso 1:
+						datos_decodificados['gnss_diagnostics_tx']['avg_sat_snr'] = "Habilitado";
+						romper;
+					por defecto:
+						datos_decodificados['gnss_diagnostics_tx']['avg_sat_snr'] = "Inválido";
 				}}
-				var val = decode_field(arg, 1, 2, 2, "unsigned");
-				{switch (val){
-					case 0:
-						decoded_data['gnss_diagnostics_tx']['reported_fix_type'] = "Disabled";
-						break;
-					case 1:
-						decoded_data['gnss_diagnostics_tx']['reported_fix_type'] = "Enabled";
-						break;
-					default:
-						decoded_data['gnss_diagnostics_tx']['reported_fix_type'] = "Invalid";
+				var val = decodificar_campo(arg, 1, 2, 2, "sin signo");
+				{cambiar (val){
+					caso 0:
+						datos_decodificados['gnss_diagnostics_tx']['reported_fix_type'] = "Deshabilitado";
+						romper;
+					caso 1:
+						datos_decodificados['gnss_diagnostics_tx']['reported_fix_type'] = "Habilitado";
+						romper;
+					por defecto:
+						datos_decodificados['gnss_diagnostics_tx']['reported_fix_type'] = "Inválido";
 				}}
-				var val = decode_field(arg, 1, 3, 3, "unsigned");
-				{switch (val){
-					case 0:
-						decoded_data['gnss_diagnostics_tx']['time_to_reported_fix'] = "Disabled";
-						break;
-					case 1:
-						decoded_data['gnss_diagnostics_tx']['time_to_reported_fix'] = "Enabled";
-						break;
-					default:
-						decoded_data['gnss_diagnostics_tx']['time_to_reported_fix'] = "Invalid";
+				var val = decodificar_campo(arg, 1, 3, 3, "sin signo");
+				{cambiar (val){
+					caso 0:
+						datos_decodificados['gnss_diagnostics_tx']['time_to_reported_fix'] = "Deshabilitado";
+						romper;
+					caso 1:
+						datos_decodificados['gnss_diagnostics_tx']['time_to_reported_fix'] = "Habilitado";
+						romper;
+					por defecto:
+						datos_decodificados['gnss_diagnostics_tx']['time_to_reported_fix'] = "Inválido";
 				}}
-				var val = decode_field(arg, 1, 4, 4, "unsigned");
-				{switch (val){
-					case 0:
-						decoded_data['gnss_diagnostics_tx']['fix_log_num'] = "Disabled";
-						break;
-					case 1:
-						decoded_data['gnss_diagnostics_tx']['fix_log_num'] = "Enabled";
-						break;
-					default:
-						decoded_data['gnss_diagnostics_tx']['fix_log_num'] = "Invalid";
+				var val = decode_field(arg, 1, 4, 4, "sin signo");
+				{cambiar (val){
+					caso 0:
+						datos_decodificados['gnss_diagnostics_tx']['fix_log_num'] = "Deshabilitado";
+						romper;
+					caso 1:
+						datos_decodificados['gnss_diagnostics_tx']['fix_log_num'] = "Habilitado";
+						romper;
+					por defecto:
+						datos_decodificados['gnss_diagnostics_tx']['fix_log_num'] = "Inválido";
 				}}
-				var val = decode_field(arg, 1, 5, 5, "unsigned");
-				{switch (val){
-					case 0:
-						decoded_data['gnss_diagnostics_tx']['fix_acc_and_num_fixes_report'] = "Disabled";
-						break;
-					case 1:
-						decoded_data['gnss_diagnostics_tx']['fix_acc_and_num_fixes_report'] = "Enabled";
-						break;
-					default:
-						decoded_data['gnss_diagnostics_tx']['fix_acc_and_num_fixes_report'] = "Invalid";
+				var val = decode_field(arg, 1, 5, 5, "sin signo");
+				{cambiar (val){
+					caso 0:
+						datos_decodificados['gnss_diagnostics_tx']['fix_acc_and_num_fixes_report'] = "Deshabilitado";
+						romper;
+					caso 1:
+						datos_decodificados['gnss_diagnostics_tx']['fix_acc_and_num_fixes_report'] = "Habilitado";
+						romper;
+					por defecto:
+						datos_decodificados['gnss_diagnostics_tx']['fix_acc_and_num_fixes_report'] = "Inválido";
 				}}
-				return 1;
+				devuelve 1;
 			}
 		},
 		{
-			key: [0x38],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('emergency_state_trigger')) {
-					decoded_data['emergency_state_trigger'] = {};
+			clave: [0x38],
+			fn: función(arg) {
+				if(!datos_decodificados.hasOwnProperty('activador_de_estado_de_emergencia')) {
+					datos_decodificados['activador_de_estado_de_emergencia'] = {};
 				}
-				var val = decode_field(arg, 1, 1, 1, "unsigned");
-				{switch (val){
-					case 0:
-						decoded_data['emergency_state_trigger']['emergency_trigger_by_ble_dz'] = "Disabled";
-						break;
-					case 1:
-						decoded_data['emergency_state_trigger']['emergency_trigger_by_ble_dz'] = "Enabled";
-						break;
-					default:
-						decoded_data['emergency_state_trigger']['emergency_trigger_by_ble_dz'] = "Invalid";
+				var val = decodificar_campo(arg, 1, 1, 1, "sin signo");
+				{cambiar (val){
+					caso 0:
+						datos_decodificados['emergency_state_trigger']['emergency_trigger_by_ble_dz'] = "Deshabilitado";
+						romper;
+					caso 1:
+						datos_decodificados['emergency_state_trigger']['emergency_trigger_by_ble_dz'] = "Habilitado";
+						romper;
+					por defecto:
+						datos_decodificados['emergency_state_trigger']['emergency_trigger_by_ble_dz'] = "Inválido";
 				}}
-				var val = decode_field(arg, 1, 0, 0, "unsigned");
-				{switch (val){
-					case 0:
-						decoded_data['emergency_state_trigger']['emergency_trigger_by_gnss_dz'] = "Disabled";
-						break;
-					case 1:
-						decoded_data['emergency_state_trigger']['emergency_trigger_by_gnss_dz'] = "Enabled";
-						break;
-					default:
-						decoded_data['emergency_state_trigger']['emergency_trigger_by_gnss_dz'] = "Invalid";
+				var val = decode_field(arg, 1, 0, 0, "sin signo");
+				{cambiar (val){
+					caso 0:
+						datos_decodificados['emergency_state_trigger']['emergency_trigger_by_gnss_dz'] = "Deshabilitado";
+						romper;
+					caso 1:
+						datos_decodificados['emergency_state_trigger']['emergency_trigger_by_gnss_dz'] = "Habilitado";
+						romper;
+					por defecto:
+						datos_decodificados['emergency_state_trigger']['emergency_trigger_by_gnss_dz'] = "Inválido";
 				}}
-				return 1;
+				devuelve 1;
 			}
 		},
 		{
-			key: [0x39],
-			fn: function(arg) {
+			clave: [0x39],
+			fn: función(arg) {
 				if(!decoded_data.hasOwnProperty('emergency_state_led_config')) {
-					decoded_data['emergency_state_led_config'] = {};
+					datos_decodificados['emergency_state_led_config'] = {};
 				}
-				decoded_data['emergency_state_led_config']['emergency_led_on_time'] = (decode_field(arg, 4, 31, 24, "unsigned") * 0.01).toFixed(2);
-				decoded_data['emergency_state_led_config']['emergency_led_off_time'] = (decode_field(arg, 4, 23, 16, "unsigned") * 0.01).toFixed(2);
-				decoded_data['emergency_state_led_config']['emergency_led_num_on_offs'] = decode_field(arg, 4, 15, 8, "unsigned");
-				decoded_data['emergency_state_led_config']['emergency_led_period'] = (decode_field(arg, 4, 7, 0, "unsigned") * 0.1).toFixed(1);
-				return 4;
+				datos_decodificados['configuración_led_de_estado_de_emergencia']['tiempo_de_encendido_led_de_emergencia'] = (campo_decodificación(arg, 4, 31, 24, "sin signo") * 0.01).toFixed(2);
+				datos_decodificados['configuración_led_de_estado_de_emergencia']['tiempo_apagado_led_de_emergencia'] = (campo_decodificación(arg, 4, 23, 16, "sin signo") * 0.01).toFixed(2);
+				datos_decodificados['configuración_led_de_estado_de_emergencia']['número_de_led_de_emergencia_encendidos_apagados'] = campo_decodificación(arg, 4, 15, 8, "sin signo");
+				datos_decodificados['configuración_led_de_estado_de_emergencia']['periodo_led_de_emergencia'] = (campo_decodificación(arg, 4, 7, 0, "sin signo") * 0.1).toFixed(1);
+				devolver 4;
 			}
 		},
 		{
-			key: [0x3B],
-			fn: function(arg) {
-				decoded_data['seconds_pressure_sample'] = decode_field(arg, 1, 5, 0, "unsigned");
-				return 1;
+			clave: [0x3B],
+			fn: función(arg) {
+				datos_decodificados['muestra_de_presión_de_segundos'] = campo_decodificación(arg, 1, 5, 0, "sin signo");
+				devuelve 1;
 			}
 		},
 		{
-			key: [0x3C],
-			fn: function(arg) {
-				var val = decode_field(arg, 2, 15, 0, "unsigned");
-				{switch (val){
-					case 0:
-						decoded_data['calibration_reference_pressure'] = "Disabled";
-						break;
-					case 1:
-						decoded_data['calibration_reference_pressure'] = "Enabled";
-						break;
-					default:
-						decoded_data['calibration_reference_pressure'] = "Invalid";
+			clave: [0x3C],
+			fn: función(arg) {
+				var val = decode_field(arg, 2, 15, 0, "sin signo");
+				{cambiar (val){
+					caso 0:
+						decoded_data['calibration_reference_pressure'] = "Deshabilitado";
+						romper;
+					caso 1:
+						decoded_data['calibration_reference_pressure'] = "Habilitado";
+						romper;
+					por defecto:
+						decoded_data['calibration_reference_pressure'] = "Inválido";
 				}}
-				return 2;
+				devolver 2;
 			}
 		},
 		{
-			key: [0x3D],
-			fn: function(arg) {
-				decoded_data['pressure_threshold_max'] = decode_field(arg, 4, 31, 16, "unsigned");
-				decoded_data['pressure_threshold_min'] = decode_field(arg, 4, 15, 0, "unsigned");
-				return 4;
+			clave: [0x3D],
+			fn: función(arg) {
+				datos_decodificados['umbral_de_presión_máxima'] = campo_decodificación(arg, 4, 31, 16, "sin signo");
+				datos_decodificados['umbral_de_presión_mín'] = campo_decodificación(arg, 4, 15, 0, "sin signo");
+				devolver 4;
 			}
 		},
 		{
-			key: [0x41],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('accelerometer_sensitivity')) {
-					decoded_data['accelerometer_sensitivity'] = {};
+			clave: [0x41],
+			fn: función(arg) {
+				if(!decoded_data.hasOwnProperty('sensibilidad_del_acelerómetro')) {
+					datos_decodificados['sensibilidad_del_acelerómetro'] = {};
 				}
-				var val = decode_field(arg, 1, 5, 4, "unsigned");
-				{switch (val){
-					case 0:
-						decoded_data['accelerometer_sensitivity']['accelerometer_measurement_range'] = "+/-2g";
-						break;
-					case 1:
-						decoded_data['accelerometer_sensitivity']['accelerometer_measurement_range'] = "+/-4 g";
-						break;
-					case 2:
-						decoded_data['accelerometer_sensitivity']['accelerometer_measurement_range'] = "+/-8 g";
-						break;
-					case 3:
-						decoded_data['accelerometer_sensitivity']['accelerometer_measurement_range'] = "+/-6 g";
-						break;
-					default:
-						decoded_data['accelerometer_sensitivity']['accelerometer_measurement_range'] = "Invalid";
+				var val = decode_field(arg, 1, 5, 4, "sin signo");
+				{cambiar (val){
+					caso 0:
+						datos_decodificados['sensibilidad_del_acelerómetro']['rango_de_medición_del_acelerómetro'] = "+/-2g";
+						romper;
+					caso 1:
+						datos_decodificados['sensibilidad_del_acelerómetro']['rango_de_medición_del_acelerómetro'] = "+/-4 g";
+						romper;
+					caso 2:
+						datos_decodificados['sensibilidad_del_acelerómetro']['rango_de_medición_del_acelerómetro'] = "+/-8 g";
+						romper;
+					caso 3:
+						datos_decodificados['sensibilidad_del_acelerómetro']['rango_de_medición_del_acelerómetro'] = "+/-6 g";
+						romper;
+					por defecto:
+						decoded_data['accelerometer_sensitivity']['accelerometer_measurement_range'] = "Inválido";
 				}}
-				var val = decode_field(arg, 1, 2, 0, "unsigned");
-				{switch (val){
-					case 1:
-						decoded_data['accelerometer_sensitivity']['accelerometer_sample_rate'] = "1 Hz";
-						break;
-					case 2:
-						decoded_data['accelerometer_sensitivity']['accelerometer_sample_rate'] = "10 Hz";
-						break;
-					case 3:
-						decoded_data['accelerometer_sensitivity']['accelerometer_sample_rate'] = "25 Hz";
-						break;
-					case 4:
-						decoded_data['accelerometer_sensitivity']['accelerometer_sample_rate'] = "50 Hz";
-						break;
-					case 5:
-						decoded_data['accelerometer_sensitivity']['accelerometer_sample_rate'] = "100 Hz";
-						break;
-					case 6:
-						decoded_data['accelerometer_sensitivity']['accelerometer_sample_rate'] = "200 Hz";
-						break;
-					case 7:
-						decoded_data['accelerometer_sensitivity']['accelerometer_sample_rate'] = "400 Hz";
-						break;
-					default:
-						decoded_data['accelerometer_sensitivity']['accelerometer_sample_rate'] = "Invalid";
+				var val = decode_field(arg, 1, 2, 0, "sin signo");
+				{cambiar (val){
+					caso 1:
+						datos_decodificados['sensibilidad_del_acelerómetro']['frecuencia_de_muestreo_del_acelerómetro'] = "1 Hz";
+						romper;
+					caso 2:
+						datos_decodificados['sensibilidad_del_acelerómetro']['frecuencia_de_muestreo_del_acelerómetro'] = "10 Hz";
+						romper;
+					caso 3:
+						datos_decodificados['sensibilidad_del_acelerómetro']['frecuencia_de_muestreo_del_acelerómetro'] = "25 Hz";
+						romper;
+					caso 4:
+						datos_decodificados['sensibilidad_del_acelerómetro']['frecuencia_de_muestreo_del_acelerómetro'] = "50 Hz";
+						romper;
+					caso 5:
+						datos_decodificados['sensibilidad_del_acelerómetro']['frecuencia_de_muestreo_del_acelerómetro'] = "100 Hz";
+						romper;
+					caso 6:
+						datos_decodificados['sensibilidad_del_acelerómetro']['frecuencia_de_muestreo_del_acelerómetro'] = "200 Hz";
+						romper;
+					caso 7:
+						datos_decodificados['sensibilidad_del_acelerómetro']['frecuencia_de_muestreo_del_acelerómetro'] = "400 Hz";
+						romper;
+					por defecto:
+						decoded_data['accelerometer_sensitivity']['accelerometer_sample_rate'] = "Inválido";
 				}}
-				return 1;
+				devuelve 1;
 			}
 		},
 		{
-			key: [0x42],
-			fn: function(arg) {
-				decoded_data['sleep_acceleration_threshold'] = (decode_field(arg, 2, 15, 0, "unsigned") * 0.001).toFixed(3);
-				return 2;
+			clave: [0x42],
+			fn: función(arg) {
+				datos_decodificados['umbral_de_aceleración_del_sueño'] = (campo_decodificación(arg, 2, 15, 0, "sin signo") * 0.001).toFixed(3);
+				devolver 2;
 			}
 		},
 		{
-			key: [0x43],
-			fn: function(arg) {
-				decoded_data['timeout_to_sleep'] = decode_field(arg, 1, 7, 0, "unsigned");
-				return 1;
+			clave: [0x43],
+			fn: función(arg) {
+				datos_decodificados['tiempo_de_espera_para_dormir'] = campo_decodificación(arg, 1, 7, 0, "sin signo");
+				devuelve 1;
 			}
 		},
 		{
-			key: [0x48],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('free_fall')) {
-					decoded_data['free_fall'] = {};
+			clave: [0x48],
+			fn: función(arg) {
+				if(!datos_decodificados.hasOwnProperty('caída_libre')) {
+					datos_decodificados['caída_libre'] = {};
 				}
-				decoded_data['free_fall']['free_fall_acceleration_threshold'] = (decode_field(arg, 4, 31, 16, "unsigned") * 0.001).toFixed(3);
-				decoded_data['free_fall']['free_fall_acceleration_interval'] = (decode_field(arg, 4, 15, 0, "unsigned") * 0.001).toFixed(3);
-				return 4;
+				datos_decodificados['caída_libre']['umbral_de_aceleración_de_caída_libre'] = (campo_decodificación(arg, 4, 31, 16, "sin signo") * 0.001).toFixed(3);
+				datos_decodificados['caída_libre']['intervalo_de_aceleración_de_caída_libre'] = (campo_decodificación(arg, 4, 15, 0, "sin signo") * 0.001).toFixed(3);
+				devolver 4;
 			}
 		},
 		{
-			key: [0x49],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('impact')) {
-					decoded_data['impact'] = {};
+			clave: [0x49],
+			fn: función(arg) {
+				si(!datos_decodificados.hasOwnProperty('impacto')) {
+					datos_decodificados['impacto'] = {};
 				}
-				decoded_data['impact']['impact_threshold'] = (decode_field(arg, 4, 31, 16, "unsigned") * 0.001).toFixed(3);
-				decoded_data['impact']['impact_blackout_duration'] = (decode_field(arg, 4, 15, 0, "unsigned") * 0.001).toFixed(3);
-				return 4;
+				datos_decodificados['impacto']['umbral_de_impacto'] = (campo_decodificación(arg, 4, 31, 16, "sin signo") * 0.001).toFixed(3);
+				datos_decodificados['impacto']['duración_del_apagón_del_impacto'] = (campo_decodificación(arg, 4, 15, 0, "sin signo") * 0.001).toFixed(3);
+				devolver 4;
 			}
 		},
 		{
-			key: [0x4A],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('torpidity')) {
-					decoded_data['torpidity'] = {};
+			clave: [0x4A],
+			fn: función(arg) {
+				if(!decoded_data.hasOwnProperty('torpidez')) {
+					datos_decodificados['torpidez'] = {};
 				}
-				decoded_data['torpidity']['torpidity_threshold'] = (decode_field(arg, 3, 23, 8, "unsigned") * 0.001).toFixed(3);
-				decoded_data['torpidity']['torpidity_interval'] = (decode_field(arg, 3, 7, 0, "unsigned") * 0.001).toFixed(3);
-				return 3;
+				datos_decodificados['torpeza']['umbral_de_torpeza'] = (campo_decodificación(arg, 3, 23, 8, "sin signo") * 0.001).toFixed(3);
+				datos_decodificados['torpidez']['intervalo_de_torpidez'] = (campo_decodificación(arg, 3, 7, 0, "sin signo") * 0.001).toFixed(3);
+				devolver 3;
 			}
 		},
 		{
-			key: [0x50],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('ble_mode')) {
-					decoded_data['ble_mode'] = {};
+			clave: [0x50],
+			fn: función(arg) {
+				si(!datos_decodificados.hasOwnProperty('ble_mode')) {
+					datos_decodificados['ble_mode'] = {};
 				}
-				var val = decode_field(arg, 1, 7, 7, "unsigned");
-				{switch (val){
-					case 0:
-						decoded_data['ble_mode']['ble_avg_mode'] = "Disabled";
-						break;
-					case 1:
-						decoded_data['ble_mode']['ble_avg_mode'] = "Enabled";
-						break;
-					default:
-						decoded_data['ble_mode']['ble_avg_mode'] = "Invalid";
+				var val = decode_field(arg, 1, 7, 7, "sin signo");
+				{cambiar (val){
+					caso 0:
+						decoded_data['ble_mode']['ble_avg_mode'] = "Deshabilitado";
+						romper;
+					caso 1:
+						datos_decodificados['ble_mode']['ble_avg_mode'] = "Habilitado";
+						romper;
+					por defecto:
+						datos_decodificados['ble_mode']['ble_avg_mode'] = "Inválido";
 				}}
-				var val = decode_field(arg, 1, 6, 6, "unsigned");
-				{switch (val){
-					case 0:
-						decoded_data['ble_mode']['ble_dz_status_report'] = "Disabled";
-						break;
-					case 1:
-						decoded_data['ble_mode']['ble_dz_status_report'] = "Enabled";
-						break;
-					default:
-						decoded_data['ble_mode']['ble_dz_status_report'] = "Invalid";
+				var val = decode_field(arg, 1, 6, 6, "sin signo");
+				{cambiar (val){
+					caso 0:
+						datos_decodificados['ble_mode']['ble_dz_status_report'] = "Deshabilitado";
+						romper;
+					caso 1:
+						datos_decodificados['ble_mode']['ble_dz_status_report'] = "Habilitado";
+						romper;
+					por defecto:
+						datos_decodificados['ble_mode']['ble_dz_status_report'] = "Inválido";
 				}}
-				decoded_data['ble_mode']['ble_num_reported_devices'] = decode_field(arg, 1, 5, 0, "unsigned");
-				return 1;
+				datos_decodificados['ble_mode']['ble_num_reported_devices'] = campo_decodificación(arg, 1, 5, 0, "sin signo");
+				devuelve 1;
 			}
 		},
 		{
-			key: [0x51],
-			fn: function(arg) {
-				decoded_data['ble_scan_duration_periodic'] = decode_field(arg, 1, 7, 0, "unsigned");
-				return 1;
+			clave: [0x51],
+			fn: función(arg) {
+				datos_decodificados['ble_scan_duration_periodic'] = campo_decodificación(arg, 1, 7, 0, "sin signo");
+				devuelve 1;
 			}
 		},
 		{
-			key: [0x52],
-			fn: function(arg) {
-				decoded_data['ble_scan_interval'] = decode_field(arg, 2, 15, 0, "unsigned");
-				return 2;
+			clave: [0x52],
+			fn: función(arg) {
+				datos_decodificados['ble_scan_interval'] = campo_decodificación(arg, 2, 15, 0, "sin signo");
+				devolver 2;
 			}
 		},
 		{
-			key: [0x53],
-			fn: function(arg) {
-				decoded_data['ble_scan_window'] = decode_field(arg, 2, 15, 0, "unsigned");
-				return 2;
+			clave: [0x53],
+			fn: función(arg) {
+				datos_decodificados['ble_scan_window'] = campo_decodificación(arg, 2, 15, 0, "sin signo");
+				devolver 2;
 			}
 		},
 		{
-			key: [0x54],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('ble_range0')) {
-					decoded_data['ble_range0'] = {};
+			clave: [0x54],
+			fn: función(arg) {
+				si(!datos_decodificados.hasOwnProperty('ble_range0')) {
+					datos_decodificados['ble_range0'] = {};
 				}
-				decoded_data['ble_range0']['ble_range0_bd_addr_oui'] = decode_field(arg, 9, 71, 48, "hexstring");
-				decoded_data['ble_range0']['ble_range0_bd_addr_start'] = decode_field(arg, 9, 47, 24, "hexstring");
-				decoded_data['ble_range0']['ble_range0_bd_addr_end'] = decode_field(arg, 9, 23, 0, "hexstring");
-				return 9;
+				datos_decodificados['ble_range0']['ble_range0_bd_addr_oui'] = campo_decodificación(arg, 9, 71, 48, "cadena hexadecimal");
+				datos_decodificados['ble_range0']['ble_range0_bd_addr_start'] = campo_decodificación(arg, 9, 47, 24, "cadena hexadecimal");
+				datos_decodificados['ble_range0']['ble_range0_bd_addr_end'] = campo_decodificación(arg, 9, 23, 0, "cadena hexadecimal");
+				devolver 9;
 			}
 		},
 		{
-			key: [0x55],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('ble_range1')) {
-					decoded_data['ble_range1'] = {};
+			clave: [0x55],
+			fn: función(arg) {
+				si(!datos_decodificados.hasOwnProperty('ble_range1')) {
+					datos_decodificados['ble_range1'] = {};
 				}
-				decoded_data['ble_range1']['ble_range1_bd_addr_oui'] = decode_field(arg, 9, 71, 48, "hexstring");
-				decoded_data['ble_range1']['ble_range1_bd_addr_start'] = decode_field(arg, 9, 47, 24, "hexstring");
-				decoded_data['ble_range1']['ble_range1_bd_addr_end'] = decode_field(arg, 9, 23, 0, "hexstring");
-				return 9;
+				datos_decodificados['ble_range1']['ble_range1_bd_addr_oui'] = campo_decodificación(arg, 9, 71, 48, "cadena hexadecimal");
+				datos_decodificados['ble_range1']['ble_range1_bd_addr_start'] = campo_decodificación(arg, 9, 47, 24, "cadena hexadecimal");
+				datos_decodificados['ble_range1']['ble_range1_bd_addr_end'] = campo_decodificación(arg, 9, 23, 0, "cadena hexadecimal");
+				devolver 9;
 			}
 		},
 		{
-			key: [0x56],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('ble_range2')) {
-					decoded_data['ble_range2'] = {};
+			clave: [0x56],
+			fn: función(arg) {
+				si(!datos_decodificados.hasOwnProperty('ble_range2')) {
+					datos_decodificados['ble_range2'] = {};
 				}
-				decoded_data['ble_range2']['ble_range2_bd_addr_oui'] = decode_field(arg, 9, 71, 48, "hexstring");
-				decoded_data['ble_range2']['ble_range2_bd_addr_start'] = decode_field(arg, 9, 47, 24, "hexstring");
-				decoded_data['ble_range2']['ble_range2_bd_addr_end'] = decode_field(arg, 9, 23, 0, "hexstring");
-				return 9;
+				datos_decodificados['ble_range2']['ble_range2_bd_addr_oui'] = campo_decodificación(arg, 9, 71, 48, "cadena hexadecimal");
+				datos_decodificados['ble_range2']['ble_range2_bd_addr_start'] = campo_decodificación(arg, 9, 47, 24, "cadena hexadecimal");
+				datos_decodificados['ble_range2']['ble_range2_bd_addr_end'] = campo_decodificación(arg, 9, 23, 0, "cadena hexadecimal");
+				devolver 9;
 			}
 		},
 		{
-			key: [0x57],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('ble_range3')) {
-					decoded_data['ble_range3'] = {};
+			clave: [0x57],
+			fn: función(arg) {
+				si(!datos_decodificados.hasOwnProperty('ble_range3')) {
+					datos_decodificados['ble_range3'] = {};
 				}
-				decoded_data['ble_range3']['ble_range3_bd_addr_oui'] = decode_field(arg, 9, 71, 48, "hexstring");
-				decoded_data['ble_range3']['ble_range3_bd_addr_start'] = decode_field(arg, 9, 47, 24, "hexstring");
-				decoded_data['ble_range3']['ble_range3_bd_addr_end'] = decode_field(arg, 9, 23, 0, "hexstring");
-				return 9;
+				datos_decodificados['ble_range3']['ble_range3_bd_addr_oui'] = campo_decodificación(arg, 9, 71, 48, "cadena hexadecimal");
+				datos_decodificados['ble_range3']['ble_range3_bd_addr_start'] = campo_decodificación(arg, 9, 47, 24, "cadena hexadecimal");
+				datos_decodificados['ble_range3']['ble_range3_bd_addr_end'] = campo_decodificación(arg, 9, 23, 0, "cadena hexadecimal");
+				devolver 9;
 			}
 		},
 		{
-			key: [0x58],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('ble_dz0')) {
-					decoded_data['ble_dz0'] = {};
+			clave: [0x58],
+			fn: función(arg) {
+				si(!datos_decodificados.hasOwnProperty('ble_dz0')) {
+					datos_decodificados['ble_dz0'] = {};
 				}
-				decoded_data['ble_dz0']['ble_dz0_bd_addr'] = decode_field(arg, 7, 55, 8, "hexstring");
-				decoded_data['ble_dz0']['ble_dz0_rssi'] = decode_field(arg, 7, 7, 0, "signed");
-				return 7;
+				datos_decodificados['ble_dz0']['ble_dz0_bd_addr'] = campo_decodificación(arg, 7, 55, 8, "cadena hexadecimal");
+				datos_decodificados['ble_dz0']['ble_dz0_rssi'] = campo_decodificación(arg, 7, 7, 0, "firmado");
+				devolver 7;
 			}
 		},
 		{
-			key: [0x59],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('ble_dz1')) {
-					decoded_data['ble_dz1'] = {};
+			clave: [0x59],
+			fn: función(arg) {
+				si(!datos_decodificados.hasOwnProperty('ble_dz1')) {
+					datos_decodificados['ble_dz1'] = {};
 				}
-				decoded_data['ble_dz1']['ble_dz1_bd_addr'] = decode_field(arg, 7, 55, 8, "hexstring");
-				decoded_data['ble_dz1']['ble_dz1_rssi'] = decode_field(arg, 7, 7, 0, "signed");
-				return 7;
+				datos_decodificados['ble_dz1']['ble_dz1_bd_addr'] = campo_decodificación(arg, 7, 55, 8, "cadena hexadecimal");
+				datos_decodificados['ble_dz1']['ble_dz1_rssi'] = campo_decodificación(arg, 7, 7, 0, "firmado");
+				devolver 7;
 			}
 		},
 		{
-			key: [0x5A],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('ble_dz2')) {
-					decoded_data['ble_dz2'] = {};
+			clave: [0x5A],
+			fn: función(arg) {
+				si(!datos_decodificados.hasOwnProperty('ble_dz2')) {
+					datos_decodificados['ble_dz2'] = {};
 				}
-				decoded_data['ble_dz2']['ble_dz2_bd_addr'] = decode_field(arg, 7, 55, 8, "hexstring");
-				decoded_data['ble_dz2']['ble_dz2_rssi'] = decode_field(arg, 7, 7, 0, "signed");
-				return 7;
+				datos_decodificados['ble_dz2']['ble_dz2_bd_addr'] = campo_decodificación(arg, 7, 55, 8, "cadena hexadecimal");
+				datos_decodificados['ble_dz2']['ble_dz2_rssi'] = campo_decodificación(arg, 7, 7, 0, "firmado");
+				devolver 7;
 			}
 		},
 		{
-			key: [0x5B],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('ble_dz3')) {
-					decoded_data['ble_dz3'] = {};
+			clave: [0x5B],
+			fn: función(arg) {
+				si(!datos_decodificados.hasOwnProperty('ble_dz3')) {
+					datos_decodificados['ble_dz3'] = {};
 				}
-				decoded_data['ble_dz3']['ble_dz3_bd_addr'] = decode_field(arg, 7, 55, 8, "hexstring");
-				decoded_data['ble_dz3']['ble_dz3_rssi'] = decode_field(arg, 7, 7, 0, "signed");
-				return 7;
+				datos_decodificados['ble_dz3']['ble_dz3_bd_addr'] = campo_decodificación(arg, 7, 55, 8, "cadena hexadecimal");
+				datos_decodificados['ble_dz3']['ble_dz3_rssi'] = campo_decodificación(arg, 7, 7, 0, "firmado");
+				devolver 7;
 			}
 		},
 		{
-			key: [0x68],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('battery_report_options')) {
-					decoded_data['battery_report_options'] = {};
+			clave: [0x68],
+			fn: función(arg) {
+				if(!datos_decodificados.hasOwnProperty('opciones_del_informe_de_batería')) {
+					datos_decodificados['opciones_del_informe_de_batería'] = {};
 				}
-				var val = decode_field(arg, 1, 2, 2, "unsigned");
-				{switch (val){
-					case 0:
-						decoded_data['battery_report_options']['battery_lifetime_dys_report'] = "Disabled";
-						break;
-					case 1:
-						decoded_data['battery_report_options']['battery_lifetime_dys_report'] = "Enabled";
-						break;
-					default:
-						decoded_data['battery_report_options']['battery_lifetime_dys_report'] = "Invalid";
+				var val = decodificar_campo(arg, 1, 2, 2, "sin signo");
+				{cambiar (val){
+					caso 0:
+						datos_decodificados['opciones_del_informe_de_batería']['informe_de_vida_de_la_batería'] = "Deshabilitado";
+						romper;
+					caso 1:
+						datos_decodificados['opciones_del_informe_de_batería']['informe_de_vida_de_la_batería'] = "Habilitado";
+						romper;
+					por defecto:
+						datos_decodificados['opciones_del_informe_de_batería']['informe_de_vida_de_la_batería'] = "Inválido";
 				}}
-				var val = decode_field(arg, 1, 1, 1, "unsigned");
-				{switch (val){
-					case 0:
-						decoded_data['battery_report_options']['battery_lifetime_pct_report'] = "Disabled";
-						break;
-					case 1:
-						decoded_data['battery_report_options']['battery_lifetime_pct_report'] = "Enabled";
-						break;
-					default:
-						decoded_data['battery_report_options']['battery_lifetime_pct_report'] = "Invalid";
+				var val = decodificar_campo(arg, 1, 1, 1, "sin signo");
+				{cambiar (val){
+					caso 0:
+						datos_decodificados['opciones_del_informe_de_batería']['informe_de_tiempo_de_vida_de_la_batería'] = "Deshabilitado";
+						romper;
+					caso 1:
+						datos_decodificados['opciones_del_informe_de_batería']['informe_de_tiempo_de_vida_de_la_batería'] = "Habilitado";
+						romper;
+					por defecto:
+						datos_decodificados['opciones_del_informe_de_batería']['informe_de_tiempo_de_vida_de_la_batería'] = "Inválido";
 				}}
-				return 1;
+				devuelve 1;
 			}
 		},
 		{
-			key: [0x69],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('low_battery_threshold')) {
-					decoded_data['low_battery_threshold'] = {};
+			clave: [0x69],
+			fn: función(arg) {
+				if(!decoded_data.hasOwnProperty('umbral_de_batería_baja')) {
+					datos_decodificados['umbral_de_batería_baja'] = {};
 				}
-				var val = decode_field(arg, 2, 15, 14, "unsigned");
-				{switch (val){
-					case 1:
-						decoded_data['low_battery_threshold']['low_battery_threshold_type'] = "Percentage";
-						break;
-					case 2:
-						decoded_data['low_battery_threshold']['low_battery_threshold_type'] = "Days";
-						break;
-					default:
-						decoded_data['low_battery_threshold']['low_battery_threshold_type'] = "Invalid";
+				var val = decode_field(arg, 2, 15, 14, "sin signo");
+				{cambiar (val){
+					caso 1:
+						decoded_data['low_battery_threshold']['low_battery_threshold_type'] = "Porcentaje";
+						romper;
+					caso 2:
+						datos_decodificados['umbral_de_batería_bajo']['tipo_umbral_de_batería_bajo'] = "Días";
+						romper;
+					por defecto:
+						datos_decodificados['umbral_de_batería_baja']['tipo_de_umbral_de_batería_baja'] = "Inválido";
 				}}
-				decoded_data['low_battery_threshold']['low_battery_threshold_value'] = decode_field(arg, 2, 13, 0, "unsigned");
-				return 2;
+				datos_decodificados['umbral_de_batería_baja']['valor_del_umbral_de_batería_baja'] = campo_decodificación(arg, 2, 13, 0, "sin signo");
+				devolver 2;
 			}
 		},
 		{
-			key: [0x6A],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('low_battery_led_config')) {
-					decoded_data['low_battery_led_config'] = {};
+			clave: [0x6A],
+			fn: función(arg) {
+				if(!datos_decodificados.hasOwnProperty('configuración_led_batería_baja')) {
+					datos_decodificados['configuración_led_batería_baja'] = {};
 				}
-				decoded_data['low_battery_led_config']['low_battery_led_on_time'] = (decode_field(arg, 4, 31, 24, "unsigned") * 0.01).toFixed(2);
-				decoded_data['low_battery_led_config']['low_battery_led_off_time'] = (decode_field(arg, 4, 23, 16, "unsigned") * 0.01).toFixed(2);
-				decoded_data['low_battery_led_config']['low_battery_led_num_on_offs'] = decode_field(arg, 4, 15, 8, "unsigned");
-				decoded_data['low_battery_led_config']['low_battery_led_period'] = decode_field(arg, 4, 7, 0, "unsigned");
-				return 4;
+				datos_decodificados['configuración_led_batería_baja']['tiempo_encendido_led_batería_baja'] = (campo_decodificación(arg, 4, 31, 24, "sin signo") * 0.01).toFixed(2);
+				datos_decodificados['configuración_led_batería_baja']['tiempo_apagado_led_batería_baja'] = (campo_decodificación(arg, 4, 23, 16, "sin signo") * 0.01).toFixed(2);
+				datos_decodificados['configuración_led_batería_baja']['número_de_leds_encendidos_apagados_baja'] = campo_decodificación(arg, 4, 15, 8, "sin signo");
+				datos_decodificados['configuración_led_batería_baja']['periodo_led_batería_baja'] = campo_decodificación(arg, 4, 7, 0, "sin signo");
+				devolver 4;
 			}
 		},
 		{
-			key: [0x6B],
-			fn: function(arg) {
-				decoded_data['avg_energy_trend_window'] = decode_field(arg, 1, 7, 0, "unsigned");
-				return 1;
+			clave: [0x6B],
+			fn: función(arg) {
+				datos_decodificados['ventana_de_tendencia_de_energía_promedio'] = campo_decodificación(arg, 1, 7, 0, "sin signo");
+				devuelve 1;
 			}
 		},
 		{
-			key: [0x6C],
-			fn: function(arg) {
-				decoded_data['buzzer_disable_timeout'] = decode_field(arg, 1, 7, 0, "unsigned");
-				return 1;
+			clave: [0x6C],
+			fn: función(arg) {
+				datos_decodificados['buzzer_disable_timeout'] = campo_decodificación(arg, 1, 7, 0, "sin signo");
+				devuelve 1;
 			}
 		},
 		{
-			key: [0x6F],
-			fn: function(arg) {
-				decoded_data['resp_format'] = decode_field(arg, 1, 7, 0, "unsigned");
-				return 1;
+			clave: [0x6F],
+			fn: función(arg) {
+				datos_decodificados['resp_format'] = campo_decodificación(arg, 1, 7, 0, "sin signo");
+				devuelve 1;
 			}
 		},
 		{
-			key: [0x71],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('metadata')) {
-					decoded_data['metadata'] = {};
+			clave: [0x71],
+			fn: función(arg) {
+				si(!datos_decodificados.hasOwnProperty('metadatos')) {
+					datos_decodificados['metadatos'] = {};
 				}
-				decoded_data['metadata']['app_ver_major'] = decode_field(arg, 7, 55, 48, "unsigned");
-				decoded_data['metadata']['app_ver_minor'] = decode_field(arg, 7, 47, 40, "unsigned");
-				decoded_data['metadata']['app_ver_revision'] = decode_field(arg, 7, 39, 32, "unsigned");
-				decoded_data['metadata']['loramac_ver_major'] = decode_field(arg, 7, 31, 24, "unsigned");
-				decoded_data['metadata']['loramac_ver_minor'] = decode_field(arg, 7, 23, 16, "unsigned");
-				decoded_data['metadata']['loramac_ver_revision'] = decode_field(arg, 7, 15, 8, "unsigned");
-				var val = decode_field(arg, 7, 7, 0, "unsigned");
-				{switch (val){
-					case 0:
-						decoded_data['metadata']['lorawan_region_id'] = "EU868";
-						break;
-					case 1:
-						decoded_data['metadata']['lorawan_region_id'] = "US916";
-						break;
-					case 2:
-						decoded_data['metadata']['lorawan_region_id'] = "AS923";
-						break;
-					case 3:
-						decoded_data['metadata']['lorawan_region_id'] = "AU915";
-						break;
-					case 4:
-						decoded_data['metadata']['lorawan_region_id'] = "IN865";
-						break;
-					case 5:
-						decoded_data['metadata']['lorawan_region_id'] = "CN470";
-						break;
-					case 6:
-						decoded_data['metadata']['lorawan_region_id'] = "KR920";
-						break;
-					case 7:
-						decoded_data['metadata']['lorawan_region_id'] = "RU864";
-						break;
-					default:
-						decoded_data['metadata']['lorawan_region_id'] = "Invalid";
+				datos_decodificados['metadatos']['app_ver_major'] = campo_decodificación(arg, 7, 55, 48, "sin signo");
+				datos_decodificados['metadatos']['versión_aplicación_menor'] = campo_decodificación(arg, 7, 47, 40, "sin signo");
+				datos_decodificados['metadatos']['revisión_de_versión_de_la_aplicación'] = campo_decodificación(arg, 7, 39, 32, "sin signo");
+				datos_decodificados['metadatos']['loramac_ver_major'] = campo_decodificación(arg, 7, 31, 24, "sin signo");
+				datos_decodificados['metadatos']['loramac_ver_minor'] = campo_decodificación(arg, 7, 23, 16, "sin signo");
+				datos_decodificados['metadatos']['loramac_ver_revision'] = campo_decodificación(arg, 7, 15, 8, "sin signo");
+				var val = decode_field(arg, 7, 7, 0, "sin signo");
+				{cambiar (val){
+					caso 0:
+						datos_decodificados['metadatos']['id_de_región_lorawan'] = "EU868";
+						romper;
+					caso 1:
+						datos_decodificados['metadatos']['id_de_región_lorawan'] = "US916";
+						romper;
+					caso 2:
+						datos_decodificados['metadatos']['id_de_región_lorawan'] = "AS923";
+						romper;
+					caso 3:
+						datos_decodificados['metadatos']['id_de_región_lorawan'] = "AU915";
+						romper;
+					caso 4:
+						datos_decodificados['metadatos']['id_de_región_lorawan'] = "IN865";
+						romper;
+					caso 5:
+						datos_decodificados['metadatos']['id_de_región_lorawan'] = "CN470";
+						romper;
+					caso 6:
+						datos_decodificados['metadatos']['lorawan_region_id'] = "KR920";
+						romper;
+					caso 7:
+						datos_decodificados['metadatos']['id_de_región_lorawan'] = "RU864";
+						romper;
+					por defecto:
+						datos_decodificados['metadata']['lorawan_region_id'] = "Inválido";
 				}}
-				return 7;
+				devolver 7;
 			}
 		},
 	];
 }
-if (input.fPort === 16) {
-	decoder = [
+si (entrada.fPuerto === 16) {
+	decodificador = [
 		{
-			key: [0x0D, 0x3C],
-			fn: function(arg) {
-				decoded_data['num_satellites'] = decode_field(arg, 1, 7, 0, "unsigned");
-				return 1;
+			clave: [0x0D, 0x3C],
+			fn: función(arg) {
+				datos_decodificados['num_satélites'] = campo_decodificación(arg, 1, 7, 0, "sin signo");
+				devuelve 1;
 			}
 		},
 		{
-			key: [0x0D, 0x64],
-			fn: function(arg) {
-				decoded_data['avg_satellite_snr'] = decode_field(arg, 2, 15, 0, "unsigned") * 0.1;
-				return 2;
+			clave: [0x0D, 0x64],
+			fn: función(arg) {
+				datos_decodificados['avg_satellite_snr'] = campo_decodificación(arg, 2, 15, 0, "sin signo") * 0.1;
+				devolver 2;
 			}
 		},
 		{
-			key: [0x0D, 0x95],
-			fn: function(arg) {
-				var val = decode_field(arg, 1, 1, 0, "unsigned");
-				{switch (val){
-					case 0:
-						decoded_data['fix_type'] = "No fix available";
-						break;
-					case 2:
-						decoded_data['fix_type'] = "2D fix";
-						break;
-					case 3:
-						decoded_data['fix_type'] = "3D Fix";
-						break;
-					default:
-						decoded_data['fix_type'] = "Invalid";
+			clave: [0x0D, 0x95],
+			fn: función(arg) {
+				var val = decode_field(arg, 1, 1, 0, "sin signo");
+				{cambiar (val){
+					caso 0:
+						decoded_data['fix_type'] = "No hay solución disponible";
+						romper;
+					caso 2:
+						decoded_data['fix_type'] = "Corrección 2D";
+						romper;
+					caso 3:
+						decoded_data['fix_type'] = "Corrección 3D";
+						romper;
+					por defecto:
+						decoded_data['fix_type'] = "Inválido";
 				}}
-				return 1;
+				devuelve 1;
 			}
 		},
 		{
-			key: [0x0D, 0x96],
-			fn: function(arg) {
-				decoded_data['time_to_fix'] = decode_field(arg, 2, 15, 0, "unsigned");
-				return 2;
+			clave: [0x0D, 0x96],
+			fn: función(arg) {
+				datos_decodificados['tiempo_para_arreglar'] = campo_decodificación(arg, 2, 15, 0, "sin signo");
+				devolver 2;
 			}
 		},
 		{
-			key: [0x0D, 0x97],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('fix_accuracy')) {
-					decoded_data['fix_accuracy'] = {};
+			clave: [0x0D, 0x97],
+			fn: función(arg) {
+				si(!datos_decodificados.hasOwnProperty('corregir_precisión')) {
+					datos_decodificados['corregir_precisión'] = {};
 				}
-				decoded_data['fix_accuracy']['gnss_vertical_accuracy'] = (decode_field(arg, 4, 31, 16, "unsigned")).toFixed(2);
-				decoded_data['fix_accuracy']['gnss_horizontal_accuracy'] = (decode_field(arg, 4, 15, 0, "unsigned")).toFixed(2);
-				return 4;
+				datos_decodificados['corregir_precisión']['precisión_vertical_gnss'] = (campo_decodificación(arg, 4, 31, 16, "sin signo")).toFixed(2);
+				datos_decodificados['corregir_precisión']['precisión_horizontal_gnss'] = (campo_decodificación(arg, 4, 15, 0, "sin signo")).toFixed(2);
+				devolver 4;
 			}
 		},
 		{
-			key: [0x0D, 0x98],
-			fn: function(arg) {
-				decoded_data['ground_speed_accuracy'] = (decode_field(arg, 4, 31, 0, "unsigned") * 0.001).toFixed(3);
-				return 4;
+			clave: [0x0D, 0x98],
+			fn: función(arg) {
+				datos_decodificados['precisión_de_velocidad_superficial'] = (campo_decodificación(arg, 4, 31, 0, "sin signo") * 0.001).toFixed(3);
+				devolver 4;
 			}
 		},
 		{
-			key: [0x0D, 0x99],
-			fn: function(arg) {
-				decoded_data['num_of_fixes'] = decode_field(arg, 1, 7, 0, "unsigned");
-				return 1;
+			clave: [0x0D, 0x99],
+			fn: función(arg) {
+				datos_decodificados['num_of_fixes'] = campo_decodificación(arg, 1, 7, 0, "sin signo");
+				devuelve 1;
 			}
 		},
 		{
-			key: [0x0D, 0x0F],
-			fn: function(arg) {
-				decoded_data['log_num'] = decode_field(arg, 2, 15, 0, "unsigned");
-				return 2;
+			clave: [0x0D, 0x0F],
+			fn: función(arg) {
+				datos_decodificados['log_num'] = campo_decodificación(arg, 2, 15, 0, "sin signo");
+				devolver 2;
 			}
 		},
 	];
 }
-if (input.fPort === 15) {
-	decoder = [
+si (entrada.fPort === 15) {
+	decodificador = [
 		{
-			key: [0x0A],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('log_request_utc_type_a')) {
-					decoded_data['log_request_utc_type_a'] = {};
+			clave: [0x0A],
+			fn: función(arg) {
+				si(!datos_decodificados.hasOwnProperty('solicitud_de_registro_utc_tipo_a')) {
+					datos_decodificados['log_request_utc_type_a'] = {};
 				}
-				decoded_data['log_request_utc_type_a']['year_0a'] = decode_field(arg, 5, 39, 34, "unsigned");
-				decoded_data['log_request_utc_type_a']['month_0a'] = decode_field(arg, 5, 33, 30, "unsigned");
-				decoded_data['log_request_utc_type_a']['day_0a'] = decode_field(arg, 5, 29, 25, "unsigned");
-				decoded_data['log_request_utc_type_a']['hour_0a'] = decode_field(arg, 5, 24, 20, "unsigned");
-				decoded_data['log_request_utc_type_a']['minute_0a'] = decode_field(arg, 5, 19, 14, "unsigned");
-				decoded_data['log_request_utc_type_a']['second_0a'] = decode_field(arg, 5, 13, 8, "unsigned");
-				decoded_data['log_request_utc_type_a']['number_0a'] = decode_field(arg, 5, 7, 0, "unsigned");
-				return 5;
+				datos_decodificados['log_request_utc_type_a']['año_0a'] = campo_decodificación(arg, 5, 39, 34, "sin signo");
+				datos_decodificados['log_request_utc_type_a']['month_0a'] = campo_decodificación(arg, 5, 33, 30, "sin signo");
+				datos_decodificados['log_request_utc_type_a']['day_0a'] = campo_decodificación(arg, 5, 29, 25, "sin signo");
+				datos_decodificados['log_request_utc_type_a']['hora_0a'] = campo_decodificación(arg, 5, 24, 20, "sin signo");
+				datos_decodificados['log_request_utc_type_a']['minuto_0a'] = campo_decodificación(arg, 5, 19, 14, "sin signo");
+				datos_decodificados['log_request_utc_type_a']['second_0a'] = campo_decodificación(arg, 5, 13, 8, "sin signo");
+				datos_decodificados['log_request_utc_type_a']['number_0a'] = campo_decodificación(arg, 5, 7, 0, "sin signo");
+				devolver 5;
 			}
 		},
 		{
-			key: [0x0B],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('log_request_utc_type_b')) {
-					decoded_data['log_request_utc_type_b'] = {};
+			clave: [0x0B],
+			fn: función(arg) {
+				si(!datos_decodificados.hasOwnProperty('solicitud_de_registro_utc_tipo_b')) {
+					datos_decodificados['log_request_utc_type_b'] = {};
 				}
-				decoded_data['log_request_utc_type_b']['number_0b'] = decode_field(arg, 1, 7, 0, "unsigned");
-				return 1;
+				datos_decodificados['log_request_utc_type_b']['number_0b'] = campo_decodificación(arg, 1, 7, 0, "sin signo");
+				devuelve 1;
 			}
 		},
 		{
-			key: [0x01],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('log_utc')) {
-					decoded_data['log_utc'] = {};
+			clave: [0x01],
+			fn: función(arg) {
+				si(!datos_decodificados.hasOwnProperty('log_utc')) {
+					datos_decodificados['log_utc'] = {};
 				}
-				decoded_data['log_utc']['fragment_number_1'] = decode_field(arg, 5, 39, 32, "unsigned");
-				decoded_data['log_utc']['year_1'] = decode_field(arg, 5, 31, 26, "unsigned");
-				decoded_data['log_utc']['month_1'] = decode_field(arg, 5, 25, 22, "unsigned");
-				decoded_data['log_utc']['day_1'] = decode_field(arg, 5, 21, 17, "unsigned");
-				decoded_data['log_utc']['hour_1'] = decode_field(arg, 5, 16, 12, "unsigned");
-				decoded_data['log_utc']['minute_1'] = decode_field(arg, 5, 11, 6, "unsigned");
-				decoded_data['log_utc']['second_1'] = decode_field(arg, 5, 5, 0, "unsigned");
-				return 5;
+				datos_decodificados['log_utc']['fragmento_número_1'] = campo_decodificación(arg, 5, 39, 32, "sin signo");
+				datos_decodificados['log_utc']['año_1'] = campo_decodificación(arg, 5, 31, 26, "sin signo");
+				datos_decodificados['log_utc']['mes_1'] = campo_decodificación(arg, 5, 25, 22, "sin signo");
+				datos_decodificados['log_utc']['día_1'] = campo_decodificación(arg, 5, 21, 17, "sin signo");
+				datos_decodificados['log_utc']['hora_1'] = campo_decodificación(arg, 5, 16, 12, "sin signo");
+				datos_decodificados['log_utc']['minuto_1'] = campo_decodificación(arg, 5, 11, 6, "sin signo");
+				datos_decodificados['log_utc']['segundo_1'] = campo_decodificación(arg, 5, 5, 0, "sin signo");
+				devolver 5;
 			}
 		},
 		{
-			key: [0x02],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('log_coordinates')) {
-					decoded_data['log_coordinates'] = {};
+			clave: [0x02],
+			fn: función(arg) {
+				si(!datos_decodificados.hasOwnProperty('coordenadas_del_registro')) {
+					datos_decodificados['coordenadas_registradas'] = {};
 				}
-				decoded_data['log_coordinates']['fragment_number_2'] = decode_field(arg, 9, 71, 64, "unsigned");
-				decoded_data['log_coordinates']['latitude_2'] = (decode_field(arg, 9, 63, 40, "signed") * 0.00001072883606).toFixed(7);
-				decoded_data['log_coordinates']['longitude_2'] = (decode_field(arg, 9, 39, 16, "signed") * 0.00002145767212).toFixed(7);
-				decoded_data['log_coordinates']['altitude_2'] = (decode_field(arg, 9, 15, 0, "signed") * 0.144958496 + -500).toFixed(3);
-				return 9;
+				datos_decodificados['coordenadas_de_registro']['número_de_fragmento_2'] = campo_decodificación(arg, 9, 71, 64, "sin signo");
+				datos_decodificados['coordenadas_registradas']['latitud_2'] = (campo_decodificado(arg, 9, 63, 40, "firmado") * 0.00001072883606).toFixed(7);
+				datos_decodificados['coordenadas_registradas']['longitud_2'] = (campo_decodificación(arg, 9, 39, 16, "firmado") * 0.00002145767212).toFixed(7);
+				datos_decodificados['coordenadas_registradas']['altitud_2'] = (campo_decodificación(arg, 9, 15, 0, "firmado") * 0.144958496 + -500).toFixed(3);
+				devolver 9;
 			}
 		},
 		{
-			key: [0x03],
-			fn: function(arg) {
-				if(!decoded_data.hasOwnProperty('log_all')) {
-					decoded_data['log_all'] = {};
+			clave: [0x03],
+			fn: función(arg) {
+				si(!datos_decodificados.hasOwnProperty('log_all')) {
+					datos_decodificados['log_all'] = {};
 				}
 					arg = arg.slice(1)
-					var data = [];
-					var loop = arg.length / 12;
-					for (var i = 0; i < loop; i++) {
-						var group = {};
-						group['year_3'] = decode_field(arg, 12, 95, 90, "unsigned");
-						group['month_3'] = decode_field(arg, 12, 89, 86, "unsigned");
-						group['day_3'] = decode_field(arg, 12, 85, 81, "unsigned");
-						group['hour_3'] = decode_field(arg, 12, 80, 76, "unsigned");
-						group['minute_3'] = decode_field(arg, 12, 75, 70, "unsigned");
-						group['second_3'] = decode_field(arg, 12, 69, 64, "unsigned");
-						group['latitude_3'] = (decode_field(arg, 12, 63, 40, "signed") * 0.00001072883606).toFixed(7);
-						group['longitude_3'] = (decode_field(arg, 12, 39, 16, "signed") * 0.00002145767212).toFixed(7);
-						group['altitude_3'] = (decode_field(arg, 12, 15, 0, "signed") * 0.144958496 + -500).toFixed(3);
-						data.push(group);
+					var datos = [];
+					var bucle = arg.longitud / 12;
+					para (var i = 0; i < bucle; i++) {
+						var grupo = {};
+						grupo['año_3'] = campo_decodificación(arg, 12, 95, 90, "sin signo");
+						grupo['mes_3'] = campo_decodificación(arg, 12, 89, 86, "sin signo");
+						grupo['día_3'] = campo_decodificación(arg, 12, 85, 81, "sin signo");
+						grupo['hora_3'] = campo_decodificación(arg, 12, 80, 76, "sin signo");
+						grupo['minuto_3'] = campo_decodificación(arg, 12, 75, 70, "sin signo");
+						grupo['segundo_3'] = campo_decodificación(arg, 12, 69, 64, "sin signo");
+						grupo['latitud_3'] = (campo_decodificación(arg, 12, 63, 40, "firmado") * 0.00001072883606).toFixed(7);
+						grupo['longitud_3'] = (campo_decodificación(arg, 12, 39, 16, "firmado") * 0.00002145767212).toFixed(7);
+						grupo['altitud_3'] = (campo_decodificación(arg, 12, 15, 0, "firmado") * 0.144958496 + -500).toFixed(3);
+						datos.push(grupo);
 						arg = arg.slice(12);
 					}
-					decoded_data['log_all'] = data;
-					return loop*12;
+					datos_decodificados['log_all'] = datos;
+					bucle de retorno*12;
 			}
 		},
 	];
 }
 
-	try {
-		for (var bytes_left = bytes.length; bytes_left > 0;) {
-			var found = false;
-			for (var i = 0; i < decoder.length; i++) {
-				var item = decoder[i];
-				var key = item.key;
-				var keylen = key.length;
-				var header = slice(bytes, 0, keylen);
-				if (is_equal(header, key)) { // Header in the data matches to what we expect
-					var f = item.fn;
-					var consumed = f(slice(bytes, keylen, bytes.length)) + keylen;
-					bytes_left -= consumed;
-					bytes = slice(bytes, consumed, bytes.length);
-					found = true;
-					break;
+	intentar {
+		para (var bytes_left = bytes.length; bytes_left > 0;) {
+			var encontrado = falso;
+			para (var i = 0; i < longitud del decodificador; i++) {
+				var item = decodificador[i];
+				var clave = elemento.clave;
+				var keylen = clave.longitud;
+				encabezado var = segmento (bytes, 0, keylen);
+				if (is_equal(header, key)) { // El encabezado en los datos coincide con lo que esperamos
+					var f = elemento.fn;
+					var consumido = f(slice(bytes, keylen, bytes.length)) + keylen;
+					bytes_left -= consumidos;
+					bytes = slice(bytes, consumido, bytes.longitud);
+					encontrado = verdadero;
+					romper;
 				}
 			}
-			if (!found) {
-				errors.push("Unable to decode header " + toHexString(header).toUpperCase());
-				break;
+			si (!encontrado) {
+				errors.push("No se puede decodificar el encabezado " + toHexString(header).toUpperCase());
+				romper;
 			}
 		}
-	} catch (error) {
-		errors = "Fatal decoder error";
+	} captura (error) {
+		errors = "Error fatal del decodificador";
 	}
 
-	function slice(a, f, t) {
+	función slice(a, f, t) {
 		var res = [];
-		for (var i = 0; i < t - f; i++) {
+		para (var i = 0; i < t - f; i++) {
 			res[i] = a[f + i];
 		}
-		return res;
+		devolver res;
 	}
 
-	// Extracts bits from a byte array
-	function extract_bytes(chunk, startBit, endBit) {
-		var array = new Array(0);
-		var totalBits = startBit - endBit + 1;
+	// Extrae bits de una matriz de bytes
+	función extract_bytes(fragmento, bit de inicio, bit de fin) {
+		var matriz = nueva Matriz(0);
+		var totalBits = bit inicial - bit final + 1;
 		var totalBytes = Math.ceil(totalBits / 8);
 		var endBits = 0;
-		var startBits = 0;
-		for (var i = 0; i < totalBytes; i++) {
-			if(totalBits > 8) {
-				endBits = endBit;
-				startBits = endBits + 7;
-				endBit = endBit + 8;
+		var bits de inicio = 0;
+		para (var i = 0; i < totalBytes; i++) {
+			si(totalBits > 8) {
+				endBits = bit final;
+				bits de inicio = bits de fin + 7;
+				bit final = bit final + 8;
 				totalBits -= 8;
-			} else {
-				endBits = endBit;
-				startBits = endBits + totalBits - 1;
+			} demás {
+				endBits = bit final;
+				bits de inicio = bits finales + bits totales - 1;
 				totalBits = 0;
 			}
 			var endChunk = chunk.length - Math.ceil((endBits + 1) / 8);
 			var startChunk = chunk.length - Math.ceil((startBits + 1) / 8);
-			var word = 0x0;
-			if (startChunk == endChunk){
+			var palabra = 0x0;
+			si (startChunk == endChunk){
 				var endOffset = endBits % 8;
-				var startOffset = startBits % 8;
-				var mask = 0xFF >> (8 - (startOffset - endOffset + 1));
-				word = (chunk[startChunk] >> endOffset) & mask;
-				array.unshift(word);
-			} else {
+				var inicioOffset = inicioBits % 8;
+				máscara var = 0xFF >> (8 - (startOffset - endOffset + 1));
+				palabra = (fragmento[startChunk] >> endOffset) & máscara;
+				matriz.unshift(palabra);
+			} demás {
 				var endChunkEndOffset = endBits % 8;
 				var endChunkStartOffset = 7;
 				var endChunkMask = 0xFF >> (8 - (endChunkStartOffset - endChunkEndOffset + 1));
 				var endChunkWord = (chunk[endChunk] >> endChunkEndOffset) & endChunkMask;
 				var startChunkEndOffset = 0;
-				var startChunkStartOffset = startBits % 8;
+				var startChunkStartOffset = inicioBits % 8;
 				var startChunkMask = 0xFF >> (8 - (startChunkStartOffset - startChunkEndOffset + 1));
 				var startChunkWord = (chunk[startChunk] >> startChunkEndOffset) & startChunkMask;
 				var startChunkWordShifted = startChunkWord << (endChunkStartOffset - endChunkEndOffset + 1);
-				word = endChunkWord | startChunkWordShifted;
-				array.unshift(word);
+				palabra = finTrozoDePalabra | inicioTrozoDePalabraDesplazado;
+				matriz.unshift(palabra);
 			}
 		}
-		return array;
+		devolver matriz;
 	}
 
-	// Applies data type to a byte array
-	function apply_data_type(bytes, data_type) {
-		var output = 0;
-		if (data_type === "unsigned") {
-			for (var i = 0; i < bytes.length; ++i) {
-				output = (to_uint(output << 8)) | bytes[i];
+	// Aplica el tipo de datos a una matriz de bytes
+	función aplicar_tipo_de_datos(bytes, tipo_de_datos) {
+		var salida = 0;
+		si (tipo_de_datos === "sin signo") {
+			para (var i = 0; i < bytes.length; ++i) {
+				salida = (to_uint(salida << 8)) | bytes[i];
 			}
-			return output;
+			salida de retorno;
 		}
-		if (data_type === "signed") {
-			for (var i = 0; i < bytes.length; ++i) {
-				output = (output << 8) | bytes[i];
+		si (tipo_de_datos === "firmado") {
+			para (var i = 0; i < bytes.length; ++i) {
+				salida = (salida << 8) | bytes[i];
 			}
-			// Convert to signed, based on value size
-			if (output > Math.pow(2, 8 * bytes.length - 1)) {
-				output -= Math.pow(2, 8 * bytes.length);
+			// Convertir a firmado, según el tamaño del valor
+			si (salida > Math.pow(2, 8 * bytes.length - 1)) {
+				salida -= Math.pow(2, 8 * bytes.length);
 			}
-			return output;
+			salida de retorno;
 		}
-		if (data_type === "bool") {
-			return !(bytes[0] === 0);
+		si (tipo_de_datos === "bool") {
+			devuelve !(bytes[0] === 0);
 		}
-		if (data_type === "hexstring") {
-			return toHexString(bytes);
+		si (tipo_de_datos === "cadena_hexadecimal") {
+			volver aHexString(bytes);
 		}
-		return null; // Incorrect data type
+		devolver nulo; // Tipo de datos incorrecto
 	}
 
-	// Decodes bitfield from the given chunk of bytes
-	function decode_field(chunk, size, start_bit, end_bit, data_type) {
-		var new_chunk = chunk.slice(0, size);
-		var chunk_size = new_chunk.length;
-		if (start_bit >= chunk_size * 8) {
-			return null; // Error: exceeding boundaries of the chunk
+	// Decodifica el campo de bits del fragmento de bytes dado
+	función decodificar_campo(fragmento, tamaño, bit_inicial, bit_final, tipo_de_datos) {
+		var new_chunk = chunk.slice(0, tamaño);
+		var chunk_size = nuevo_chunk.length;
+		si (bit_de_inicio >= tamaño_del_fragmento * 8) {
+			devolver nulo; // Error: se excedieron los límites del fragmento
 		}
-		if (start_bit < end_bit) {
-			return null; // Error: invalid input
+		si (bit_inicio < bit_final) {
+			devolver nulo; // Error: entrada no válida
 		}
-		var array = extract_bytes(new_chunk, start_bit, end_bit);
-		return apply_data_type(array, data_type);
+		var array = extract_bytes(nuevo_fragmento, bit_inicial, bit_final);
+		devolver aplicar_tipo_de_datos(matriz, tipo_de_datos);
 	}
 
-	// Converts value to unsigned
-	function to_uint(x) {
-		return x >>> 0;
+	// Convierte el valor a sin signo
+	función to_uint(x) {
+		devolver x >>> 0;
 	}
 
-	// Checks if two arrays are equal
-	function is_equal(arr1, arr2) {
-		if (arr1.length != arr2.length) {
-			return false;
+	// Comprueba si dos matrices son iguales
+	función es_igual(arr1, arr2) {
+		si (arr1.longitud != arr2.longitud) {
+			devuelve falso;
 		}
-		for (var i = 0; i != arr1.length; i++) {
-			if (arr1[i] != arr2[i]) {
-				return false;
+		para (var i = 0; i != arr1.length; i++) {
+			si (arr1[i] != arr2[i]) {
+				devuelve falso;
 			}
 		}
-		return true;
+		devuelve verdadero;
 	}
 
-	// Converts array of bytes to hex string
-	function toHexString(byteArray) {
+	// Convierte una matriz de bytes en una cadena hexadecimal
+	función toHexString(byteArray) {
 		var arr = [];
-		for (var i = 0; i < byteArray.length; ++i) {
+		para (var i = 0; i < byteArray.length; ++i) {
 			arr.push(('0' + (byteArray[i] & 0xFF).toString(16)).slice(-2));
 		}
-		return arr.join(' ');
+		devolver arr.join(' ');
 	}
 
-    // Converts array of bytes to 8 bit array
-    function convertToUint8Array(byteArray) {
+    // Convierte una matriz de bytes en una matriz de 8 bits
+    función convertToUint8Array(byteArray) {
 		var arr = [];
-		for (var i = 0; i < byteArray.length; i++) {
+		para (var i = 0; i < byteArray.length; i++) {
 			arr.push(to_uint(byteArray[i]) & 0xff);
 		}
-		return arr;
+		retorno arr;
 	}
 
-    var output = {
-        "data": decoded_data,
-		"errors": errors,
-		"warnings": [],
+    var salida = {
+        "datos": datos_decodificados,
+		"errores": errores,
+		"advertencias": [],
     };
 
-    return output;
+    salida de retorno;
 }
 
-app.post('/api/sensor-data', (req, res) => {
-  const body = req.body;
-  const payload = body.payload;
-  const deviceMetaData = body.payloadMetaData?.deviceMetaData || {};
+app.post('/api/datos-del-sensor', (req, res) => {
+  constante cuerpo = req.cuerpo;
+  constante payload = cuerpo.payload;
+  constante deviceMetaData = cuerpo.payloadMetaData?.deviceMetaData || {};
 
   // Procesar bytes
-  let bytes = payload.bytes;
-  if (typeof bytes === 'string') {
-    try {
+  deje bytes = carga útil.bytes;
+  si (tipo de bytes === 'cadena') {
+    intentar {
       bytes = JSON.parse(bytes);
-    } catch (e) {
-      return res.status(400).send('Invalid byte string format');
+    } captura (e) {
+      return res.status(400).send('Formato de cadena de bytes inválido');
     }
   }
-  const convertedBytes = bytes.map(b => (b < 0 ? b + 256 : b));
-  const decodedData = decodeUplink({ bytes: convertedBytes, fPort: payload.port });
+  const convertBytes = bytes.map(b => (b < 0 ? b + 256 : b));
+  const decodedData = decodeUplink({ bytes: convertBytes, fPort: payload.port });
 
   latestSensorData = decodedData.data;
 
-  const deviceEUI = deviceMetaData.deviceEUI || 'unknown_device';
-  const deviceName = deviceMetaData.name || `ID: ${deviceEUI}`;
+  const deviceEUI = deviceMetaData.deviceEUI || 'dispositivo_desconocido';
+  constante deviceName = deviceMetaData.name || `ID: ${deviceEUI}`;
 
-  if (!allSensorsData[deviceEUI]) allSensorsData[deviceEUI] = {};
-  allSensorsData[deviceEUI].name = deviceName;
-  Object.assign(allSensorsData[deviceEUI], decodedData.data);
+  si (!allSensorsData[dispositivoEUI]) allSensorsData[dispositivoEUI] = {};
+  allSensorsData[deviceEUI].name = nombreDeDispositivo;
+  Objeto.assign(allSensorsData[dispositivoEUI], decodedData.data);
 
-  if (decodedData.data.acceleration_vector) {
-    allSensorsData[deviceEUI].acceleration_vector = {
-      ...allSensorsData[deviceEUI].acceleration_vector,
+  si (decodedData.data.acceleration_vector) {
+    allSensorsData[dispositivoEUI].vector_de_aceleración = {
+      ...allSensorsData[dispositivoEUI].vector_de_aceleración,
       ...decodedData.data.acceleration_vector
     };
   }
-  if (decodedData.data.safety_status) {
-    allSensorsData[deviceEUI].safety_status = {
-      ...allSensorsData[deviceEUI].safety_status,
+  si (decodedData.data.safety_status) {
+    allSensorsData[dispositivoEUI].estado_de_seguridad = {
+      ...allSensorsData[dispositivoEUI].estado_de_seguridad,
       ...decodedData.data.safety_status
     };
   }
-  if (decodedData.data.coordinates) {
-    allSensorsData[deviceEUI].coordinates = {
-      ...allSensorsData[deviceEUI].coordinates,
-      ...decodedData.data.coordinates
+  si (decodedData.data.coordinates) {
+    allSensorsData[dispositivoEUI].coordenadas = {
+      ...allSensorsData[dispositivoEUI].coordenadas,
+      ...datos decodificados.datos.coordenadas
     };
   }
 
   res.status(200).send('OK');
 });
 
-app.get('/api/get-all-sensors', (req, res) => {
-  res.json(allSensorsData);
+app.get('/api/obtener-todos-los-sensores', (req, res) => {
+  res.json(todosLosSensoresDatos);
 });
 
-app.use(express.static(path.join(__dirname, 'public')));
+aplicación.use(express.static(path.join(__dirname, 'público')));
 
-app.listen(PORT, () => {
+aplicación.listen(PUERTO, () => {
   console.log(`Servidor de backend escuchando en http://localhost:${PORT}`);
 });
