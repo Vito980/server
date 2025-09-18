@@ -3,6 +3,7 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const path = require('path');
+const https = require('https');
 
 const app = express();
 const PORT = 3000;
@@ -12,6 +13,52 @@ let allSensorsData = {};
 
 app.use(cors());
 app.use(bodyParser.json());
+
+
+// Agregar configuración Kona Core 
+const KONA_CORE_CONFIG = {
+  baseUrl: 'lorawan-ns-na.tektelic.com',
+  apiPath: '/api/v2/integration',
+  apiKey: 'cb66080dd64545a883c51b0c7cd27b081908a710a8d24274992bc14d81251715',
+  relayDeviceEUI: '495EFCB2947C5A9C',
+  fPort: 2
+};
+
+// Función sendRelayCommand 
+function sendRelayCommand(command) {
+  const hexBuffer = Buffer.from(command, 'hex');
+  const base64Payload = hexBuffer.toString('base64');
+  const downlinkPayload = {
+    deviceEUI: KONA_CORE_CONFIG.relayDeviceEUI,
+    fPort: KONA_CORE_CONFIG.fPort,
+    data: base64Payload,
+    confirmed: false
+  };
+  const postData = JSON.stringify(downlinkPayload);
+  const options = {
+    hostname: KONA_CORE_CONFIG.baseUrl,
+    port: 443,
+    path: `${KONA_CORE_CONFIG.apiPath}/${KONA_CORE_CONFIG.apiKey}`,
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(postData)
+    }
+  };
+  const req = https.request(options, (res) => {
+    let body = '';
+    res.on('data', (chunk) => { body += chunk; });
+    res.on('end', () => {
+      console.log(res.statusCode === 200
+        ? `Comando ${command} enviado con éxito.`
+        : `Error ${res.statusCode}: ${body}`);
+    });
+  });
+  req.on('error', (err) => console.error('HTTP error:', err));
+  req.write(postData);
+  req.end();
+}
+
 
 function decodeUplink(input){
 
@@ -1623,8 +1670,13 @@ app.post('/api/sensor-data', (req, res) => {
     }
   }
   const convertedBytes = bytes.map(b => (b < 0 ? b + 256 : b));
+
+
+	
   const decodedData = decodeUplink({ bytes: convertedBytes, fPort: payload.port });
 
+
+	
   latestSensorData = decodedData.data;
 
   const deviceEUI = deviceMetaData.deviceEUI || 'unknown_device';
@@ -1653,6 +1705,35 @@ app.post('/api/sensor-data', (req, res) => {
     };
   }
 
+  //  Decodificar safetystatus 
+  function decodeUplink(input) {
+    const hex = input.bytes.map(b => b.toString(16).padStart(2,'0'))
+                     .join('').toUpperCase();
+    const result = {};
+    if (hex.startsWith('0295') && input.bytes.length >= 5) {
+      const statusByte = input.bytes[4];
+      result.safetystatus = {
+        safetystatuseb: (statusByte & 0x01) ? 'Active' : 'Inactive'
+      };
+    }
+    return { data: result };
+  }
+
+   const decodedData = decodeUplink({ bytes, fPort: payload.port });
+
+  // Lógica botón de pánico 
+  if (decodedData.data.safetystatus) {
+    if (decodedData.data.safetystatuseb === 'Active') {
+      console.log('¡BOTÓN DE PÁNICO ACTIVADO!');
+      sendRelayCommand('FFFF');
+    } else {
+      console.log('Botón de pánico desactivado');
+      sendRelayCommand('C101');
+    }
+  }
+
+	
+	
   res.status(200).send('OK');
 });
 
@@ -1664,4 +1745,5 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.listen(PORT, () => {
   console.log(`Servidor de backend escuchando en http://localhost:${PORT}`);
+
 });
