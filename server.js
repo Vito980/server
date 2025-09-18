@@ -12,17 +12,19 @@ let allSensorsData = {};
 
 // Variables para control de pánico y dispositivo relé
 let lastPanicStatus = {};
-const relayDeviceEUI = '495EFCB2947C5A9C';          // Device EUI del relé
+const relayDeviceEUI = '495EFCB2947C5A9C'; // Device EUI del relé
 const relayDeviceID = 'df0e76b0-934c-11f0-8bf6-23e0814aad86'; // Device ID del relé
 
-// Definición directa en código de token y URL base de Kona Core
-const apiToken = 'YOUR_API_TOKEN_AQUI';  // Reemplaza con tu token real
-const baseUrl = 'https://server-h34m.onrender.com/api/v2';  // Reemplaza con tu URL base correcta
+// Token obtenido con curl
+const apiToken = 'eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJ6dXJpb...'; // Pon aquí tu token completo
+
+// URL base de la API Kona Core (ajusta según tu configuración)
+const baseUrl = 'https://lorawan-ns-na.tektelic.com/api/v1'; 
 
 app.use(cors());
 app.use(bodyParser.json());
 
-// Función para enviar downlink via API Kona Core
+// Función para enviar downlink vía API Kona Core
 async function sendDownlink(deviceID, dataHex) {
   try {
     const response = await axios.post(
@@ -44,7 +46,6 @@ async function sendDownlink(deviceID, dataHex) {
     console.error('Error enviando downlink:', error.response?.data || error.message);
   }
 }
-
 function decodeUplink(input){
 
 	var decoded_data = {};
@@ -1641,25 +1642,21 @@ if (input.fPort === 15) {
 }
 
 // Endpoint para recibir datos de sensores
+
 app.post('/api/sensor-data', async (req, res) => {
   try {
     const body = req.body;
     const payload = body.payload;
     const deviceMetaData = body.payloadMetaData?.deviceMetaData || {};
-
-    // Procesar bytes
+    
+    // Convertir bytes negativos a unsigned
     let bytes = payload.bytes;
     if (typeof bytes === 'string') {
-      try {
-        bytes = JSON.parse(bytes);
-      } catch (e) {
-        return res.status(400).send('Invalid byte string format');
-      }
+      bytes = JSON.parse(bytes);
     }
     const convertedBytes = bytes.map(b => (b < 0 ? b + 256 : b));
 
-    const decodedData = decodeUplink({ bytes: convertedBytes, fPort: payload.port });
-
+    const decodedData = decodeUplink({bytes: convertedBytes, fPort: payload.port});
     latestSensorData = decodedData.data;
 
     const deviceEUI = deviceMetaData.deviceEUI || 'unknown_device';
@@ -1690,7 +1687,6 @@ app.post('/api/sensor-data', async (req, res) => {
 
     // Detectar cambio en el botón de pánico
     const currentPanic = decodedData.data.safety_status?.safety_status_eb;
-
     if (lastPanicStatus[deviceEUI] !== currentPanic) {
       lastPanicStatus[deviceEUI] = currentPanic;
 
