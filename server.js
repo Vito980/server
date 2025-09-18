@@ -2,6 +2,7 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const path = require('path');
+const axios = require('axios');
 
 const app = express();
 const PORT = 3000;
@@ -9,8 +10,39 @@ const PORT = 3000;
 let latestSensorData = null;
 let allSensorsData = {};
 
+// Variables para control de pánico y dispositivo relé
+let lastPanicStatus = {};
+const relayDeviceEUI = '495EFCB2947C5A9C';          // Device EUI del relé
+const relayDeviceID = 'df0e76b0-934c-11f0-8bf6-23e0814aad86'; // Device ID del relé
+
 app.use(cors());
 app.use(bodyParser.json());
+
+// Función para enviar downlink via API Kona Core
+async function sendDownlink(deviceID, dataHex) {
+  const apiToken = process.env.KONA_API_TOKEN;
+  const baseUrl = process.env.KONA_BASE_URL;
+
+  try {
+    const response = await axios.post(
+      `${baseUrl}/devices/${deviceID}/downlinkqueue`,
+      {
+        port: 2,
+        confirmed: false,
+        data: dataHex
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${apiToken}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+    console.log('Downlink enviado:', response.data);
+  } catch (error) {
+    console.error('Error enviando downlink:', error.response?.data || error.message);
+  }
+}
 
 function decodeUplink(input){
 
@@ -1607,52 +1639,74 @@ if (input.fPort === 15) {
     return output;
 }
 
-app.post('/api/sensor-data', (req, res) => {
-  const body = req.body;
-  const payload = body.payload;
-  const deviceMetaData = body.payloadMetaData?.deviceMetaData || {};
+// Endpoint para recibir datos de sensores
+app.post('/api/sensor-data', async (req, res) => {
+  try {
+    const body = req.body;
+    const payload = body.payload;
+    const deviceMetaData = body.payloadMetaData?.deviceMetaData || {};
 
-  // Procesar bytes
-  let bytes = payload.bytes;
-  if (typeof bytes === 'string') {
-    try {
-      bytes = JSON.parse(bytes);
-    } catch (e) {
-      return res.status(400).send('Invalid byte string format');
+    // Procesar bytes
+    let bytes = payload.bytes;
+    if (typeof bytes === 'string') {
+      try {
+        bytes = JSON.parse(bytes);
+      } catch (e) {
+        return res.status(400).send('Invalid byte string format');
+      }
     }
+    const convertedBytes = bytes.map(b => (b < 0 ? b + 256 : b));
+
+    const decodedData = decodeUplink({ bytes: convertedBytes, fPort: payload.port });
+
+    latestSensorData = decodedData.data;
+
+    const deviceEUI = deviceMetaData.deviceEUI || 'unknown_device';
+    const deviceName = deviceMetaData.name || `ID: ${deviceEUI}`;
+
+    if (!allSensorsData[deviceEUI]) allSensorsData[deviceEUI] = {};
+    allSensorsData[deviceEUI].name = deviceName;
+    Object.assign(allSensorsData[deviceEUI], decodedData.data);
+
+    if (decodedData.data.acceleration_vector) {
+      allSensorsData[deviceEUI].acceleration_vector = {
+        ...allSensorsData[deviceEUI].acceleration_vector,
+        ...decodedData.data.acceleration_vector
+      };
+    }
+    if (decodedData.data.safety_status) {
+      allSensorsData[deviceEUI].safety_status = {
+        ...allSensorsData[deviceEUI].safety_status,
+        ...decodedData.data.safety_status
+      };
+    }
+    if (decodedData.data.coordinates) {
+      allSensorsData[deviceEUI].coordinates = {
+        ...allSensorsData[deviceEUI].coordinates,
+        ...decodedData.data.coordinates
+      };
+    }
+
+    // Detectar cambio en el botón de pánico
+    const currentPanic = decodedData.data.safety_status?.safety_status_eb;
+
+    if (lastPanicStatus[deviceEUI] !== currentPanic) {
+      lastPanicStatus[deviceEUI] = currentPanic;
+
+      if (currentPanic === 'Active') {
+        console.log(`Botón de pánico ACTIVADO en ${deviceName}. Enviando downlink para prender relé.`);
+        await sendDownlink(relayDeviceID, 'FFFF');  // Enciende relé
+      } else {
+        console.log(`Botón de pánico DESACTIVADO en ${deviceName}. Enviando downlink para apagar relé.`);
+        await sendDownlink(relayDeviceID, 'C101');  // Apaga relé
+      }
+    }
+
+    res.status(200).send('OK');
+  } catch (error) {
+    console.error('Error procesando solicitud:', error);
+    res.status(500).send('Error interno de servidor');
   }
-  const convertedBytes = bytes.map(b => (b < 0 ? b + 256 : b));
-  const decodedData = decodeUplink({ bytes: convertedBytes, fPort: payload.port });
-
-  latestSensorData = decodedData.data;
-
-  const deviceEUI = deviceMetaData.deviceEUI || 'unknown_device';
-  const deviceName = deviceMetaData.name || `ID: ${deviceEUI}`;
-
-  if (!allSensorsData[deviceEUI]) allSensorsData[deviceEUI] = {};
-  allSensorsData[deviceEUI].name = deviceName;
-  Object.assign(allSensorsData[deviceEUI], decodedData.data);
-
-  if (decodedData.data.acceleration_vector) {
-    allSensorsData[deviceEUI].acceleration_vector = {
-      ...allSensorsData[deviceEUI].acceleration_vector,
-      ...decodedData.data.acceleration_vector
-    };
-  }
-  if (decodedData.data.safety_status) {
-    allSensorsData[deviceEUI].safety_status = {
-      ...allSensorsData[deviceEUI].safety_status,
-      ...decodedData.data.safety_status
-    };
-  }
-  if (decodedData.data.coordinates) {
-    allSensorsData[deviceEUI].coordinates = {
-      ...allSensorsData[deviceEUI].coordinates,
-      ...decodedData.data.coordinates
-    };
-  }
-
-  res.status(200).send('OK');
 });
 
 app.get('/api/get-all-sensors', (req, res) => {
@@ -1664,3 +1718,4 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.listen(PORT, () => {
   console.log(`Servidor de backend escuchando en http://localhost:${PORT}`);
 });
+
