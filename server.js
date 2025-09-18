@@ -15,14 +15,15 @@ let lastPanicStatus = {};
 const relayDeviceEUI = '495EFCB2947C5A9C';          // Device EUI del relé
 const relayDeviceID = 'df0e76b0-934c-11f0-8bf6-23e0814aad86'; // Device ID del relé
 
+// Definición directa en código de token y URL base de Kona Core
+const apiToken = 'YOUR_API_TOKEN_AQUI';  // Reemplaza con tu token real
+const baseUrl = 'https://server-h34m.onrender.com/api/v2';  // Reemplaza con tu URL base correcta
+
 app.use(cors());
 app.use(bodyParser.json());
 
 // Función para enviar downlink via API Kona Core
 async function sendDownlink(deviceID, dataHex) {
-  const apiToken = process.env.KONA_API_TOKEN;
-  const baseUrl = process.env.KONA_BASE_URL;
-
   try {
     const response = await axios.post(
       `${baseUrl}/devices/${deviceID}/downlinkqueue`,
@@ -1716,6 +1717,7 @@ app.get('/api/get-all-sensors', (req, res) => {
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.listen(PORT, () => {
-  console.log(`Servidor de backend escuchando en http://localhost:${PORT}`);
+  console.log(`Servidor escuchando en http://localhost:${PORT}`);
 });
+
 
