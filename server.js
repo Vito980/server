@@ -1719,7 +1719,6 @@ app.post('/api/sensor-data', (req, res) => {
     return { data: result };
   }
 
-   const decodedData = decodeUplink({ bytes, fPort: payload.port });
 
   // Lógica botón de pánico 
   if (decodedData.data.safetystatus) {
@@ -1747,3 +1746,4 @@ app.listen(PORT, () => {
   console.log(`Servidor de backend escuchando en http://localhost:${PORT}`);
 
 });
+
