@@ -3085,7 +3085,17 @@ app.post('/api/sensor-data', (req, res) => {
   } else {
     decodedData = decodeUplinkSeal({ bytes: convertedBytes, fPort: payload.port });
   }
+// VALIDACIÓN PROTECTORA - Agrega esto:
+  if (!decodedData) {
+    console.error('decodedData is undefined');
+    return res.status(500).send('Error: decodedData is undefined');
+  }
 
+  // Si decodedData no tiene propiedad 'data', crear una estructura compatible
+  if (!decodedData.data) {
+    console.log('Converting decodedData to have data property');
+    decodedData = { data: decodedData };
+  }
   latestSensorData = decodedData.data;
 
   if (!allSensorsData[deviceEUI]) allSensorsData[deviceEUI] = {};
@@ -3123,6 +3133,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.listen(PORT, () => {
   console.log(`Servidor de backend escuchando en http://localhost:${PORT}`);
 });
+
 
 
 
