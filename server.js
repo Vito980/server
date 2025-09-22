@@ -3071,7 +3071,7 @@ app.post('/api/sensor-data', (req, res) => {
     }
   }
   const convertedBytes = bytes.map(b => (b < 0 ? b + 256 : b));
-  const decodedData = decodeUplinkSeal({ bytes: convertedBytes, fPort: payload.port });
+  
 
   latestSensorData = decodedData.data;
 
@@ -3123,4 +3123,5 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.listen(PORT, () => {
   console.log(`Servidor de backend escuchando en http://localhost:${PORT}`);
 });
+
 
