@@ -3072,14 +3072,14 @@ app.post('/api/sensor-data', (req, res) => {
   }
   const convertedBytes = bytes.map(b => (b < 0 ? b + 256 : b));
   
-
+  let decodedData;
   latestSensorData = decodedData.data;
 
   const deviceEUI = deviceMetaData.deviceEUI || 'unknown_device';
   const deviceName = deviceMetaData.name || `ID: ${deviceEUI}`;
 
   // Selección del decodificador según deviceEUI
-  let decodedData;
+  
   if (orcaDeviceEUIs.includes(deviceEUI)) {
     decodedData = decodeUplinkOrca({ bytes: convertedBytes, fPort: payload.port });
   } else {
@@ -3123,6 +3123,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.listen(PORT, () => {
   console.log(`Servidor de backend escuchando en http://localhost:${PORT}`);
 });
+
 
 
 
