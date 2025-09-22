@@ -3051,79 +3051,89 @@ if (input.fPort === 15) {
 }
 
 app.post('/api/sensor-data', (req, res) => {
-  const body = req.body;
-  const payload = body.payload;
-  const deviceMetaData = body.payloadMetaData?.deviceMetaData || {};
+  try {
+    const body = req.body;
+    const payload = body.payload;
+    const deviceMetaData = body.payloadMetaData?.deviceMetaData || {};
 
-  // Lista de deviceEUI para sensores ORCA
-  const orcaDeviceEUIs = [
-    "647FDA000001B8B8",
-    "647FDA000001B886"
-  ];
-	
-  // Procesar bytes
-  let bytes = payload.bytes;
-  if (typeof bytes === 'string') {
-    try {
-      bytes = JSON.parse(bytes);
-    } catch (e) {
-      return res.status(400).send('Invalid byte string format');
+    const orcaDeviceEUIs = [
+      "647FDA000001B8B8",
+      "647FDA000001B886"
+    ];
+
+    let bytes = payload.bytes;
+    if (typeof bytes === 'string') {
+      try {
+        bytes = JSON.parse(bytes);
+      } catch (e) {
+        return res.status(400).send('Invalid byte string format');
+      }
     }
-  }
-  const convertedBytes = bytes.map(b => (b < 0 ? b + 256 : b));
-  
-  let decodedData;
-  latestSensorData = decodedData.data;
+    const convertedBytes = bytes.map(b => (b < 0 ? b + 256 : b));
 
-  const deviceEUI = deviceMetaData.deviceEUI || 'unknown_device';
-  const deviceName = deviceMetaData.name || `ID: ${deviceEUI}`;
+    const deviceEUI = deviceMetaData.deviceEUI || 'unknown_device';
+    const deviceName = deviceMetaData.name || `ID: ${deviceEUI}`;
 
-  // Selección del decodificador según deviceEUI
-  
-  if (orcaDeviceEUIs.includes(deviceEUI)) {
-    decodedData = decodeUplinkOrca({ bytes: convertedBytes, fPort: payload.port });
-  } else {
-    decodedData = decodeUplinkSeal({ bytes: convertedBytes, fPort: payload.port });
-  }
-// VALIDACIÓN PROTECTORA - Agrega esto:
-  if (!decodedData) {
-    console.error('decodedData is undefined');
-    return res.status(500).send('Error: decodedData is undefined');
-  }
+    let decodedData = null;
+    
+    try {
+      if (orcaDeviceEUIs.includes(deviceEUI)) {
+        decodedData = decodeUplinkOrca({ bytes: convertedBytes, fPort: payload.port });
+      } else {
+        decodedData = decodeUplinkSeal({ bytes: convertedBytes, fPort: payload.port });
+      }
+    } catch (error) {
+      console.error('Error in decoder function:', error);
+      decodedData = null;
+    }
 
-  // Si decodedData no tiene propiedad 'data', crear una estructura compatible
-  if (!decodedData.data) {
-    console.log('Converting decodedData to have data property');
-    decodedData = { data: decodedData };
-  }
-  latestSensorData = decodedData.data;
+    // PROTECCIÓN TOTAL - Esta parte es CRÍTICA
+    let sensorData = {};
+    
+    if (!decodedData) {
+      console.log('decodedData is null/undefined, using empty object');
+      sensorData = {};
+    } else if (decodedData.data) {
+      sensorData = decodedData.data;
+    } else {
+      console.log('decodedData has no data property, using decodedData directly');
+      sensorData = decodedData;
+    }
 
-  if (!allSensorsData[deviceEUI]) allSensorsData[deviceEUI] = {};
-  allSensorsData[deviceEUI].name = deviceName;
-  Object.assign(allSensorsData[deviceEUI], decodedData.data);
+    latestSensorData = sensorData;
 
-  if (decodedData.data.acceleration_vector) {
-    allSensorsData[deviceEUI].acceleration_vector = {
-      ...allSensorsData[deviceEUI].acceleration_vector,
-      ...decodedData.data.acceleration_vector
-    };
-  }
-  if (decodedData.data.safety_status) {
-    allSensorsData[deviceEUI].safety_status = {
-      ...allSensorsData[deviceEUI].safety_status,
-      ...decodedData.data.safety_status
-    };
-  }
-  if (decodedData.data.coordinates) {
-    allSensorsData[deviceEUI].coordinates = {
-      ...allSensorsData[deviceEUI].coordinates,
-      ...decodedData.data.coordinates
-    };
-  }
+    if (!allSensorsData[deviceEUI]) allSensorsData[deviceEUI] = {};
+    allSensorsData[deviceEUI].name = deviceName;
+    Object.assign(allSensorsData[deviceEUI], sensorData);
 
-  res.status(200).send('OK');
+    if (sensorData.acceleration_vector) {
+      allSensorsData[deviceEUI].acceleration_vector = {
+        ...allSensorsData[deviceEUI].acceleration_vector,
+        ...sensorData.acceleration_vector
+      };
+    }
+    if (sensorData.safety_status) {
+      allSensorsData[deviceEUI].safety_status = {
+        ...allSensorsData[deviceEUI].safety_status,
+        ...sensorData.safety_status
+      };
+    }
+    if (sensorData.coordinates) {
+      allSensorsData[deviceEUI].coordinates = {
+        ...allSensorsData[deviceEUI].coordinates,
+        ...sensorData.coordinates
+      };
+    }
+
+    res.status(200).send('OK');
+    
+  } catch (error) {
+    console.error('Critical error in /api/sensor-data:', error);
+    res.status(500).send('Internal server error');
+  }
 });
 
+	
 app.get('/api/get-all-sensors', (req, res) => {
   res.json(allSensorsData);
 });
@@ -3133,6 +3143,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.listen(PORT, () => {
   console.log(`Servidor de backend escuchando en http://localhost:${PORT}`);
 });
+
 
 
 
