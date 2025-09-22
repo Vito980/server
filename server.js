@@ -1450,7 +1450,11 @@ if (input.fPort === 15) {
 		"warnings": [],
     };
 
-    return output;
+    return {
+        data: decoded_data,
+        errors: errors,
+        warnings: []
+    };
 }
 
 
@@ -3047,7 +3051,11 @@ if (input.fPort === 15) {
 		"warnings": [],
     };
 
-    return output;
+    return {
+        data: decoded_data,
+        errors: errors,
+        warnings: []
+    };
 }
 
 app.post('/api/sensor-data', (req, res) => {
@@ -3123,6 +3131,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.listen(PORT, () => {
   console.log(`Servidor de backend escuchando en http://localhost:${PORT}`);
 });
+
 
 
 
