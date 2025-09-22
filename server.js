@@ -3055,6 +3055,12 @@ app.post('/api/sensor-data', (req, res) => {
   const payload = body.payload;
   const deviceMetaData = body.payloadMetaData?.deviceMetaData || {};
 
+  // Lista de deviceEUI para sensores ORCA
+  const orcaDeviceEUIs = [
+    "647FDA000001B8B8",
+    "647FDA000001B886"
+  ];
+	
   // Procesar bytes
   let bytes = payload.bytes;
   if (typeof bytes === 'string') {
@@ -3071,6 +3077,16 @@ app.post('/api/sensor-data', (req, res) => {
 
   const deviceEUI = deviceMetaData.deviceEUI || 'unknown_device';
   const deviceName = deviceMetaData.name || `ID: ${deviceEUI}`;
+
+  // Selección del decodificador según deviceEUI
+  let decodedData;
+  if (orcaDeviceEUIs.includes(deviceEUI)) {
+    decodedData = decodeUplinkOrca({ bytes: convertedBytes, fPort: payload.port });
+  } else {
+    decodedData = decodeUplinkSeal({ bytes: convertedBytes, fPort: payload.port });
+  }
+
+  latestSensorData = decodedData.data;
 
   if (!allSensorsData[deviceEUI]) allSensorsData[deviceEUI] = {};
   allSensorsData[deviceEUI].name = deviceName;
@@ -3107,3 +3123,4 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.listen(PORT, () => {
   console.log(`Servidor de backend escuchando en http://localhost:${PORT}`);
 });
+
