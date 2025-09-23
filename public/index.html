@@ -178,13 +178,18 @@
       } else {
         // SEAL metrics
         metricsHtml = `
-          <div class="metric"><span class="label">Batería:</span> ${sensor.battery_lifetime_pct ?? '—'}%</div>
-          <div class="metric"><span class="label">Temperatura:</span> ${sensor.temperature ?? '—'} °C</div>
-          <div class="metric"><span class="label">Presión Atmósfera:</span> ${sensor.barometric_pressure ?? '—'} hPa</div>
-          <div class="metric"><span class="label">Movimiento (X,Y,Z):</span> ${sensor.acceleration_vector?.acceleration_x ?? '—'}, ${sensor.acceleration_vector?.acceleration_y ?? '—'}, ${sensor.acceleration_vector?.acceleration_z ?? '—'}</div>
-          <div class="metric"><span class="label">Ubicación:</span> Lat: ${sensor.coordinates?.latitude ?? '—'}, Lon: ${sensor.coordinates?.longitude ?? '—'}</div>
-          <div class="metric"><span class="label">Altitud:</span> ${sensor.coordinates?.altitude ?? '—'} m</div>
-        `;
+        <div class="metric"><span class="label">Batería:</span> ${sensor.battery_lifetime_pct ?? '—'}%</div>
+        <div class="metric"><span class="label">Temperatura:</span> ${sensor.temperature ?? '—'} °C</div>
+        <div class="metric"><span class="label">Presión Atmosférica:</span> ${sensor.barometric_pressure ?? '—'} hPa</div>
+        <div class="metric"><span class="label">Movimiento (X,Y,Z):</span> ${sensor.acceleration_vector?.acceleration_x ?? '—'}${sensor.acceleration_vector ? ', ' + sensor.acceleration_vector.acceleration_y : ''}${sensor.acceleration_vector ? ', ' + sensor.acceleration_vector.acceleration_z : ''}</div>
+        <div class="metric"><span class="label">Ubicación:</span> Lat: ${sensor.coordinates?.latitude ?? '—'}, Lon: ${sensor.coordinates?.longitude ?? '—'}</div>
+        <div class="metric"><span class="label">Altitud:</span> ${sensor.coordinates?.altitude ?? '—'} m</div>
+        <div class="metric"><span class="label">Pánico:</span> ${sensor.safety_status?.safety_status_eb ?? '—'}</div>
+        <div class="metric"><span class="label">Estado Caída:</span> ${sensor.safety_status?.safety_status_fall ?? '—'}</div>
+        <div class="metric"><span class="label">SH:</span> ${sensor.safety_status?.safety_status_sh ?? '—'}</div>
+        <div class="metric"><span class="label">EAR:</span> ${sensor.safety_status?.safety_status_ear ?? '—'}</div>
+        <div class="metric"><span class="label">Presión:</span> ${sensor.safety_status?.safety_status_pressure ?? '—'}</div>
+`;
       }
       div.innerHTML = `<div class="sensor-title">${sensor.name || `ID: ${sensorId}`}</div>${metricsHtml}`;
       return div;
@@ -293,3 +298,4 @@
   </script>
 </body>
 </html>
+
