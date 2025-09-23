@@ -3074,12 +3074,23 @@ app.post('/api/sensor-data', (req, res) => {
     const deviceEUI = deviceMetaData.deviceEUI || 'unknown_device';
     const deviceName = deviceMetaData.name || `ID: ${deviceEUI}`;
 
+    // LOGGING PARA DEBUGGING
+    console.log('\n=== UPLINK RECEIVED ===');
+    console.log(`Device EUI: ${deviceEUI}`);
+    console.log(`Device Name: ${deviceName}`);
+    console.log(`Port: ${payload.port}`);
+    console.log(`Raw bytes: [${convertedBytes.join(', ')}]`);
+    console.log(`Hex: ${convertedBytes.map(b => '0x' + b.toString(16).padStart(2, '0')).join(' ')}`);
+    console.log(`Is ORCA device: ${orcaDeviceEUIs.includes(deviceEUI)}`);
+
     let decodedData = null;
     
     try {
       if (orcaDeviceEUIs.includes(deviceEUI)) {
+        console.log('Using ORCA decoder...');
         decodedData = decodeUplinkOrca({ bytes: convertedBytes, fPort: payload.port });
       } else {
+        console.log('Using SEAL decoder...');
         decodedData = decodeUplinkSeal({ bytes: convertedBytes, fPort: payload.port });
       }
     } catch (error) {
@@ -3087,7 +3098,7 @@ app.post('/api/sensor-data', (req, res) => {
       decodedData = null;
     }
 
-    // PROTECCIÓN TOTAL - Esta parte es CRÍTICA
+    // PROTECCIÓN TOTAL
     let sensorData = {};
     
     if (!decodedData) {
@@ -3095,10 +3106,21 @@ app.post('/api/sensor-data', (req, res) => {
       sensorData = {};
     } else if (decodedData.data) {
       sensorData = decodedData.data;
+      console.log('Using decodedData.data');
     } else {
       console.log('decodedData has no data property, using decodedData directly');
       sensorData = decodedData;
     }
+
+    // LOGGING DE DATOS DECODIFICADOS
+    console.log('Final sensor data:', JSON.stringify(sensorData, null, 2));
+    
+    if (sensorData.coordinates) {
+      console.log('COORDINATES FOUND:', sensorData.coordinates);
+    } else {
+      console.log('NO COORDINATES in decoded data');
+    }
+    console.log('========================\n');
 
     latestSensorData = sensorData;
 
@@ -3143,6 +3165,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.listen(PORT, () => {
   console.log(`Servidor de backend escuchando en http://localhost:${PORT}`);
 });
+
 
 
 
