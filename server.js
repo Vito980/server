@@ -3144,6 +3144,7 @@ app.post('/api/sensor-data', (req, res) => {
       allSensorsData[deviceEUI].coordinates = {
         ...allSensorsData[deviceEUI].coordinates,
         ...sensorData.coordinates
+		timestamp: new Date().toLocaleString()
       };
     }
 
@@ -3165,6 +3166,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.listen(PORT, () => {
   console.log(`Servidor de backend escuchando en http://localhost:${PORT}`);
 });
+
 
 
 
