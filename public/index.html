@@ -1,187 +1,295 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8" />
-<title>Métricas de Sensores con Alertas y Listado de Ubicaciones</title>
-<style>
-  body { font-family: Arial, sans-serif; margin: 20px; background: #f4f7f8; }
-  .sensors-row { display: flex; gap: 20px; flex-wrap: wrap; }
-  .sensor-window { background: white; border: 2px solid #0a74da; border-radius: 8px; box-shadow: 2px 2px 12px rgba(0,0,0,0.1); padding: 15px; width: 300px; box-sizing: border-box; }
-  .sensor-title { font-size: 1.3em; font-weight: bold; color: #0a74da; margin-bottom: 12px; }
-  .metric { margin-bottom: 8px; }
-  .label { font-weight: bold; color: #0464c9; }
-  #notifications { position: fixed; top: 10px; right: 10px; max-width: 360px; z-index: 1000; }
-  .notification { background: #ff5252; color: #fff; padding: 12px 20px; border-radius: 6px; margin-bottom: 10px; font-weight: bold; animation: flash 1s infinite; }
-  @keyframes flash { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
-  .locations-container { margin-top: 40px; }
-  .sensor-locations { background: #fff; border: 2px solid #0a74da; border-radius: 8px; box-shadow: 2px 2px 12px rgba(0,0,0,0.1); padding: 15px; margin-bottom: 20px; max-width: 600px; }
-  .locations-header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
-  .locations-header h2 { margin: 0; color: #0a74da; font-size: 1.2em; }
-  .locations-list { list-style: none; padding-left: 0; max-height: 200px; overflow-y: auto; margin-top: 10px; display: none; }
-  .locations-list li { padding: 4px 0; border-bottom: 1px solid #ddd; font-size: 0.9em; }
-  .download-btn { background: #0a74da; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
-  .download-btn:hover { background: #084a9b; }
-</style>
+  <meta charset="UTF-8" />
+  <title>Monitoreo de Sensores</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background: #f4f7f8;
+    }
+    h1 { font-size: 2em; }
+    .sensor-type-title {
+      font-size: 1.2em;
+      font-weight: bold;
+      margin: 20px 0 8px;
+      color: #03396c;
+    }
+    .sensors-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 22px;
+      justify-content: flex-start;
+      align-items: stretch;
+    }
+    .sensor-window {
+      background: white;
+      border: 2px solid #0a74da;
+      border-radius: 8px;
+      box-shadow: 2px 2px 12px rgba(0,0,0,0.1);
+      padding: 15px 20px;
+      width: 300px;
+      margin-bottom: 20px;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      align-items: start;
+    }
+    .sensor-title {
+      font-size: 1.15em;
+      font-weight: bold;
+      color: #0a74da;
+      margin-bottom: 8px;
+    }
+    .metric {
+      margin-bottom: 7px;
+    }
+    .label {
+      font-weight: bold;
+      color: #0464c9;
+    }
+    #notifications {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      max-width: 360px;
+      z-index: 1000;
+    }
+    .notification {
+      background: #ff5252;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 6px;
+      margin-bottom: 10px;
+      font-weight: bold;
+      animation: flash 1s infinite;
+    }
+    @keyframes flash {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+    .locations-container {
+      margin-top: 38px;
+    }
+    .sensor-locations {
+      background: white;
+      border: 2px solid #0a74da;
+      border-radius: 8px;
+      box-shadow: 2px 2px 12px rgba(0,0,0,0.1);
+      padding: 15px 20px;
+      margin-bottom: 20px;
+      max-width: 600px;
+    }
+    .locations-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+    }
+    .locations-header h2 {
+      margin: 0;
+      color: #0a74da;
+      font-size: 1em;
+    }
+    .locations-list {
+      list-style: none;
+      padding-left: 0;
+      max-height: 210px;
+      overflow-y: auto;
+      margin-top: 10px;
+      display: none;
+    }
+    .locations-list li {
+      padding: 3px 0;
+      border-bottom: 1px solid #ddd;
+      font-size: 0.9em;
+    }
+    .download-btn {
+      background: #0a74da;
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .download-btn:hover {
+      background: #084a9b;
+    }
+  </style>
 </head>
 <body>
-<h1>Monitoreo de Sensores</h1>
-<div class="sensor-type-title">Sensores SEAL</div>
-<div id="seal-sensors-container" class="sensors-row"></div>
+  <h1>Monitoreo de Sensores</h1>
+  <div class="sensor-type-title">Sensores SEAL</div>
+  <div id="seal-sensors-container" class="sensors-row"></div>
 
-<div class="sensor-type-title">Sensores ORCA</div>
-<div id="orca-sensors-container" class="sensors-row"></div>
+  <div class="sensor-type-title">Sensores ORCA</div>
+  <div id="orca-sensors-container" class="sensors-row"></div>
 
-<div id="notifications"></div>
+  <div id="notifications"></div>
 
-<div class="locations-container" id="locations-container">
-  <div class="sensor-type-title">Ubicaciones por Sensor</div>
-</div>
+  <div class="locations-container" id="locations-container">
+    <div class="sensor-type-title">Ubicaciones por Sensor</div>
+  </div>
 
-<script>
-const sealContainer = document.getElementById('seal-sensors-container');
-const orcaContainer = document.getElementById('orca-sensors-container');
-const notificationsDiv = document.getElementById('notifications');
-const locationsContainer = document.getElementById('locations-container');
+  <script>
+    const sealContainer = document.getElementById('seal-sensors-container');
+    const orcaContainer = document.getElementById('orca-sensors-container');
+    const notificationsDiv = document.getElementById('notifications');
+    const locationsContainer = document.getElementById('locations-container');
 
-const orcaDeviceEUIs = ["647FDA000001B8B8","647FDA000001B886"];
-const currentAlerts = {};
-const sensorLocations = {}; // { sensorId: [ {lat, lon, ts} ] }
+    const orcaDeviceEUIs = ["647FDA000001B8B8","647FDA000001B886"];
+    const currentAlerts = {};
+    const sensorLocations = {};  // { sensorId: [ {lat, lon, ts} ] }
+    let allSensorsData = {};
 
-// Mostrar alertas relacionadas con el nombre del sensor
-function showNotificationOnce(key, message) {
-  if (!currentAlerts[key]) {
-    const notif = document.createElement('div');
-    notif.className = 'notification';
-    notif.id = key;
-    notif.textContent = message;
-    notificationsDiv.appendChild(notif);
-    currentAlerts[key] = notif;
-  }
-}
-function removeNotification(key) {
-  if (currentAlerts[key]) {
-    currentAlerts[key].remove();
-    delete currentAlerts[key];
-  }
-}
+    function showNotificationOnce(key, message) {
+      if (!currentAlerts[key]) {
+        const notif = document.createElement('div');
+        notif.className = 'notification';
+        notif.id = key;
+        notif.textContent = message;
+        notificationsDiv.appendChild(notif);
+        currentAlerts[key] = notif;
+      }
+    }
+    function removeNotification(key) {
+      if (currentAlerts[key]) {
+        currentAlerts[key].remove();
+        delete currentAlerts[key];
+      }
+    }
 
-function createSensorWindow(sensorId, sensor, container) {
-  const div = document.createElement('div');
-  div.className = 'sensor-window';
-  div.id = `sensor_${sensorId}`;
-  let extraMetrics = '';
-  if (orcaDeviceEUIs.includes(sensorId)) {
-    extraMetrics = `
-      <div class="metric"><span class="label">Batería:</span> ${sensor.battery_lifetime_pct ?? '—'}%</div>
-      <div class="metric"><span class="label">Ubicación:</span> Lat: ${sensor.coordinates?.latitude ?? '—'}, Lon: ${sensor.coordinates?.longitude ?? '—'}</div>
-      <div class="metric"><span class="label">Alarma Aceleración:</span> ${sensor.safety_status?.safety_status_fall ?? '—'}</div>
-      <div class="metric"><span class="label">Altitud:</span> ${sensor.coordinates?.altitude ?? '—'} m</div>
-    `;
-  }
-  div.innerHTML = `
-    <div class="sensor-title">${sensor.name || `ID: ${sensorId}`}</div>
-    ${extraMetrics}
-  `;
-  return div;
-}
+    function createSensorWindow(sensorId, sensor, container) {
+      const div = document.createElement('div');
+      div.className = 'sensor-window';
+      div.id = `sensor_${sensorId}`;
+      let metricsHtml = '';
+      if (orcaDeviceEUIs.includes(sensorId)) {
+        // ORCA metrics
+        metricsHtml = `
+          <div class="metric"><span class="label">Batería:</span> ${sensor.battery_lifetime_pct ?? '—'}%</div>
+          <div class="metric"><span class="label">Voltaje:</span> ${sensor.battery1_status?.voltage_1 ?? sensor.battery2_status?.voltage_2 ?? '—'} V</div>
+          <div class="metric"><span class="label">Ubicación:</span> Lat: ${sensor.coordinates?.latitude ?? '—'}, Lon: ${sensor.coordinates?.longitude ?? '—'}</div>
+          <div class="metric"><span class="label">Alarma Aceleración:</span> ${sensor.safety_status?.safety_status_fall ?? '—'}</div>
+          <div class="metric"><span class="label">Movimiento:</span> ${sensor.is_moving ? "En movimiento" : "Quieto"}</div>
+          <div class="metric"><span class="label">Altitud:</span> ${sensor.coordinates?.altitude ?? '—'} m</div>
+        `;
+      } else {
+        // SEAL metrics
+        metricsHtml = `
+          <div class="metric"><span class="label">Batería:</span> ${sensor.battery_lifetime_pct ?? '—'}%</div>
+          <div class="metric"><span class="label">Temperatura:</span> ${sensor.temperature ?? '—'} °C</div>
+          <div class="metric"><span class="label">Presión Atmósfera:</span> ${sensor.barometric_pressure ?? '—'} hPa</div>
+          <div class="metric"><span class="label">Movimiento (X,Y,Z):</span> ${sensor.acceleration_vector?.acceleration_x ?? '—'}, ${sensor.acceleration_vector?.acceleration_y ?? '—'}, ${sensor.acceleration_vector?.acceleration_z ?? '—'}</div>
+          <div class="metric"><span class="label">Ubicación:</span> Lat: ${sensor.coordinates?.latitude ?? '—'}, Lon: ${sensor.coordinates?.longitude ?? '—'}</div>
+          <div class="metric"><span class="label">Altitud:</span> ${sensor.coordinates?.altitude ?? '—'} m</div>
+        `;
+      }
+      div.innerHTML = `<div class="sensor-title">${sensor.name || `ID: ${sensorId}`}</div>${metricsHtml}`;
+      return div;
+    }
 
-function createLocationsBlock(sensorId, sensorName) {
-  const block = document.createElement('div');
-  block.className = 'sensor-locations';
-  block.id = `loc_${sensorId}`;
-  const header = document.createElement('div');
-  header.className = 'locations-header';
-  header.innerHTML = `
-    <h2>${sensorName || sensorId}</h2>
-    <button class="download-btn">Descargar CSV</button>
-  `;
-  const list = document.createElement('ul');
-  list.className = 'locations-list';
-  block.append(header, list);
-  header.addEventListener('click', () => {
-    list.style.display = (list.style.display==='none'||!list.style.display)? 'block' : 'none';
-  });
-  header.querySelector('button').addEventListener('click', e => {
-    e.stopPropagation();
-    downloadCSV(sensorId);
-  });
-  return block;
-}
-
-function updateLocations(sensorId, coords) {
-  if (!coords.latitude || !coords.longitude || !coords.timestamp) return;
-  sensorLocations[sensorId] = sensorLocations[sensorId] || [];
-  const last = sensorLocations[sensorId].slice(-1)[0];
-  if (last && last.lat===coords.latitude && last.lon===coords.longitude && last.ts===coords.timestamp) return;
-  sensorLocations[sensorId].push({ lat: coords.latitude, lon: coords.longitude, ts: coords.timestamp });
-  let block = document.getElementById(`loc_${sensorId}`);
-  if (!block) {
-    // Crear el bloque si no existe
-    block = createLocationsBlock(sensorId, allSensorsData[sensorId]?.name);
-    locationsContainer.appendChild(block);
-  }
-  const list = block.querySelector('.locations-list');
-  const li = document.createElement('li');
-  li.textContent = `${coords.timestamp} → Lat ${coords.latitude}, Lon ${coords.longitude}`;
-  list.appendChild(li);
-}
-
-function downloadCSV(sensorId) {
-  const rows = sensorLocations[sensorId]||[];
-  let csv = 'timestamp,latitude,longitude\n';
-  rows.forEach(r => {
-    csv += `${r.ts},${r.lat},${r.lon}\n`;
-  });
-  const blob = new Blob([csv], {type:'text/csv'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${sensorId}_locations.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-function checkAlerts(sensor, sensorId) {
-  const name = sensor.name || sensorId;
-  if (sensor.safety_status?.safety_status_eb==='Active') showNotificationOnce(`panic_${sensorId}`, `Pánico ACTIVADO en ${name}`);
-  else removeNotification(`panic_${sensorId}`);
-  if (sensor.temperature!=null&&(sensor.temperature<17||sensor.temperature>27)) showNotificationOnce(`temp_${sensorId}`, `Temp fuera de rango en ${name}: ${sensor.temperature} °C`);
-  else removeNotification(`temp_${sensorId}`);
-  if (sensor.battery_lifetime_pct!=null && sensor.battery_lifetime_pct<35) showNotificationOnce(`bat_${sensorId}`, `Batería baja en ${name}: ${sensor.battery_lifetime_pct}%`);
-  else removeNotification(`bat_${sensorId}`);
-  if (sensor.safety_status?.safety_status_fall==='Active') showNotificationOnce(`fall_${sensorId}`, `Caída en ${name}`);
-  else removeNotification(`fall_${sensorId}`);
-}
-
-let allSensorsData = {};
-function loadSensorData() {
-  fetch('/api/get-all-sensors')
-    .then(res => res.ok ? res.json() : Promise.reject(res.statusText))
-    .then(data => {
-      Object.assign(allSensorsData, data);
-      // Limpia y actualiza sensores
-      sealContainer.innerHTML = '<div class="sensor-type-title">Sensores SEAL</div>';
-      orcaContainer.innerHTML = '<div class="sensor-type-title">Sensores ORCA</div>';
-      Object.entries(data).forEach(([id, sensor]) => {
-        const container = orcaDeviceEUIs.includes(id) ? orcaContainer : sealContainer;
-        container.appendChild(createSensorWindow(id, sensor, container));
-        checkAlerts(sensor, id);
-        if (sensor.coordinates) updateLocations(id, sensor.coordinates);
+    function createLocationsBlock(sensorId, sensorName) {
+      const block = document.createElement('div');
+      block.className = 'sensor-locations';
+      block.id = `loc_${sensorId}`;
+      const header = document.createElement('div');
+      header.className = 'locations-header';
+      header.innerHTML = `
+        <h2>${sensorName || sensorId}</h2>
+        <button class="download-btn">Descargar CSV</button>
+      `;
+      const list = document.createElement('ul');
+      list.className = 'locations-list';
+      block.append(header, list);
+      header.addEventListener('click', () => {
+        list.style.display = list.style.display === 'none' ? 'block' : 'none';
       });
-    })
-    .catch(console.error);
-}
+      header.querySelector('button').addEventListener('click', e => {
+        e.stopPropagation();
+        downloadCSV(sensorId);
+      });
+      return block;
+    }
 
-// Automatizar descarga de ubicaciones cada 30 min
-setInterval(() => {
-  Object.keys(sensorLocations).forEach(sensorId => {
-    if (sensorLocations[sensorId].length > 0) downloadCSV(sensorId);
-  });
-}, 1800000);
+    function updateLocations(sensorId, coords) {
+      if (!coords.latitude || !coords.longitude || !coords.timestamp) return;
+      sensorLocations[sensorId] = sensorLocations[sensorId] || [];
+      const last = sensorLocations[sensorId].slice(-1)[0];
+      if (last && last.lat === coords.latitude && last.lon === coords.longitude && last.ts === coords.timestamp) return;
+      sensorLocations[sensorId].push({ lat: coords.latitude, lon: coords.longitude, ts: coords.timestamp });
+      let block = document.getElementById(`loc_${sensorId}`);
+      if (!block) {
+        block = createLocationsBlock(sensorId, allSensorsData[sensorId]?.name);
+        locationsContainer.appendChild(block);
+      }
+      const list = block.querySelector('.locations-list');
+      const li = document.createElement('li');
+      li.textContent = `${coords.timestamp} → Lat ${coords.latitude}, Lon ${coords.longitude}`;
+      list.appendChild(li);
+    }
 
-// Refrescar datos cada 1 seg
-loadSensorData();
-setInterval(loadSensorData, 1000);
-</script>
+    function downloadCSV(sensorId) {
+      const rows = sensorLocations[sensorId] || [];
+      let csv = 'timestamp,latitude,longitude\n';
+      csv += rows.map(r => `${r.ts},${r.lat},${r.lon}`).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${sensorId}_locations.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function checkAlerts(sensor, sensorId) {
+      const name = sensor.name || sensorId;
+      if (sensor.safety_status?.safety_status_eb === 'Active')
+        showNotificationOnce(`panic_${sensorId}`, `Botón Pánico ACTIVADO en ${name}`);
+      else removeNotification(`panic_${sensorId}`);
+      if (sensor.temperature != null && (sensor.temperature < 17 || sensor.temperature > 27))
+        showNotificationOnce(`temp_${sensorId}`, `Temperatura fuera de rango en ${name}: ${sensor.temperature}°C`);
+      else removeNotification(`temp_${sensorId}`);
+      if (sensor.battery_lifetime_pct != null && sensor.battery_lifetime_pct < 35)
+        showNotificationOnce(`bat_${sensorId}`, `Batería baja en ${name}: ${sensor.battery_lifetime_pct}%`);
+      else removeNotification(`bat_${sensorId}`);
+      if (sensor.safety_status?.safety_status_fall === 'Active')
+        showNotificationOnce(`fall_${sensorId}`, `Alerta de CAÍDA en ${name}`);
+      else removeNotification(`fall_${sensorId}`);
+    }
+
+    function loadSensorData() {
+      fetch('/api/get-all-sensors')
+        .then(res => res.ok ? res.json() : Promise.reject(res.statusText))
+        .then(data => {
+          allSensorsData = data;
+          sealContainer.innerHTML = '';
+          orcaContainer.innerHTML = '';
+          Object.entries(data).forEach(([id, sensor]) => {
+            const container = orcaDeviceEUIs.includes(id) ? orcaContainer : sealContainer;
+            container.appendChild(createSensorWindow(id, sensor, container));
+            checkAlerts(sensor, id);
+            if (sensor.coordinates) {
+              updateLocations(id, sensor.coordinates);
+            }
+          });
+        })
+        .catch(console.error);
+    }
+
+    // Descarga automática cada 30 minutos
+    setInterval(() => {
+      Object.keys(sensorLocations).forEach(sensorId => {
+        if (sensorLocations[sensorId] && sensorLocations[sensorId].length > 0) {
+          downloadCSV(sensorId);
+        }
+      });
+    }, 1800000);
+
+    // Carga inicial y refresco continuo
+    loadSensorData();
+    setInterval(loadSensorData, 1000);
+  </script>
 </body>
 </html>
